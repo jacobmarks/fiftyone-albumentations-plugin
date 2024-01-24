@@ -1,0 +1,12 @@
+fiftyone:
+  version: ">=0.23.3"
+name: "@jacobmarks/albumentations_augmentation"
+version: "1.0.0"
+description: "Test out various Albumentations transformations on your data!"
+url: "https://github.com/jacobmarks/fiftyone-albumentations-plugin"
+operators:
+  - augment_with_albumentations
+  - get_last_albumentations_run_info
+  - view_last_albumentations_run
+  - save_albumentations_transform
+  - save_albumentations_augmentations
