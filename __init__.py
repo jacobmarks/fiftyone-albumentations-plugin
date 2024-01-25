@@ -16,11 +16,22 @@ import re
 import fiftyone as fo
 import fiftyone.operators as foo
 from fiftyone.operators import types
+from fiftyone.core.utils import add_sys_path
 
 LAST_ALBUMENTATIONS_RUN_KEY = "_last_albumentations_run"
 
 ## for camelCase to snake_case conversion
 pattern = re.compile(r'(?<!^)(?=[A-Z])')
+
+with add_sys_path(os.path.dirname(os.path.abspath(__file__))):
+    # pylint: disable=no-name-in-module,import-error
+    from supported_transforms import (
+        SUPPORTED_BLUR_TRANSFORMS,
+        SUPPORTED_CROP_TRANSFORMS,
+        SUPPORTED_DROPOUT_TRANSFORMS,
+        SUPPORTED_GEOMETRIC_TRANSFORMS,
+        SUPPORTED_FUNCTIONAL_TRANSFORMS,
+    )
 
 NAME_TO_TYPE = {
     "scale": "float",
@@ -34,107 +45,8 @@ NAME_TO_TYPE = {
     "shear": "float",
 }
 
-SUPPORTED_BLURS_TRANSFORMS = (
-    # "AdvancedBlur",
-    "Blur",
-    "Defocus",
-    "GaussianBlur",
-    "GlassBlur",
-    "MedianBlur",
-    "MotionBlur",
-    "ZoomBlur",
-)
-
-
-SUPPORTED_CROP_TRANSFORMS = (
-    "BBoxSafeRandomCrop",
-    "CenterCrop",
-    "Crop",
-    "CropAndPad",
-    "RandomCrop",
-    "RandomCropFromBorders",
-    "RandomResizedCrop",
-    "RandomSizedBBoxSafeCrop",
-    "RandomSizedCrop",
-)
-
-
-SUPPORTED_GEOMETRIC_TRANSFORMS = (
-    "Affine",
-    "ElasticTransform",
-    "Flip",
-    "GridDistortion",
-    "HorizontalFlip",
-    "LongestMaxSize",
-    "OpticalDistortion",
-    "PadIfNeeded",
-    "Perspective",
-    # "PiecewiseAffine",
-    "RandomRotate90",
-    # "Rotate",
-    "RandomScale",
-    "Resize",
-    "SafeRotate",
-    "ShiftScaleRotate",
-    "SmallestMaxSize",
-    "Transpose",
-    "VerticalFlip",
-)
-
-
-SUPPORTED_DROPOUT_TRANSFORMS = (
-    "ChannelDropout",
-    "CoarseDropout",
-    "Cutout",
-    # "GridDropout",
-    # "MaskDropout",
-)
-
-
-SUPPORTED_FUNCTIONAL_TRANSFORMS = (
-    "ChannelShuffle",
-    "CLAHE",
-    "ColorJitter",
-    "Downscale",
-    "Emboss",
-    "Equalize",
-    "FancyPCA",
-    "GaussNoise",
-    "HueSaturationValue",
-    "ImageCompression",
-    "InvertImg",
-    "ISONoise",
-    "JpegCompression",
-    "MultiplicativeNoise",
-    "Normalize",
-    "PixelDropout",
-    "Posterize",
-    "RandomBrightness",
-    "RandomBrightnessContrast",
-    "RandomContrast",
-    "RandomFog",
-    "RandomGamma",
-    # "RandomGravel",
-    # "RandomGridShuffle",
-    "RandomRain",
-    # "RandomShadow",
-    "RandomSnow",
-    # "RandomSunFlare",
-    "RandomToneCurve",
-    "RGBShift",
-    "RingingOvershoot",
-    "Sharpen",
-    "Solarize",
-    "Spatter",
-    "Superpixels",
-    "ToGray",
-    "ToSepia",
-    "UnsharpMask",
-)
-
-
 SUPPORTED_TRANSFORMS = (
-    *SUPPORTED_BLURS_TRANSFORMS,
+    *SUPPORTED_BLUR_TRANSFORMS,
     *SUPPORTED_CROP_TRANSFORMS,
     *SUPPORTED_GEOMETRIC_TRANSFORMS,
     *SUPPORTED_DROPOUT_TRANSFORMS,
@@ -782,53 +694,6 @@ def _create_transform(ctx, transform_name):
     return t(*args, **kwargs)
 
 
-################################################
-################################################
-################# Transformations ##############
-
-
-
-### RandomGridShuffle
-
-
-# def _random_grid_shuffle_input(ctx, inputs):
-#     ## [int, int] for grid not supported yet
-#     inputs.int(
-#         "random_grid_shuffle__grid",
-#         label="Grid",
-#         description="Grid size for shuffling.",
-#         required=True,
-#         default=3,
-#     )
-#     inputs.int(
-#         "random_grid_shuffle__p",
-#         label="Probability",
-#         description="The probability of applying the transform",
-#         required=True,
-#         default=0.5,
-#     )
-
-
-# def _random_grid_shuffle_transform(ctx):
-#     grid = ctx.params.get("random_grid_shuffle__grid", None)
-#     p = ctx.params.get("random_grid_shuffle__p", None)
-#     return A.RandomGridShuffle(grid=grid, p=p)
-
-
-### RandomRain
-
-### DON'T REMOVE
-def _RandomRain_input(ctx, inputs):
-    _add_transform_inputs(inputs, "RandomRain")
-    ## drop color not supported yet
-    ## rain type not supported yet
-
-def _RandomRain_transform(ctx):
-    return _create_transform(ctx, "RandomRain")
-
-
-
-
 
 ####### Unifying functions #######
 
@@ -1312,8 +1177,6 @@ class GetAlbumentationsRunInfo(foo.Operator):
         run_keys = ctx.dataset.list_runs()
         run_keys = [run_key for run_key in run_keys if run_key.startswith("albumentations_transform_")]
         rum_names = [ctx.dataset.get_run_info(run_key).config.name for run_key in run_keys]
-
-        name_key_map = {name: key for name, key in zip(rum_names, run_keys)}
 
         if len(run_keys) == 0:
             inputs.view(
