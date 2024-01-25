@@ -34,54 +34,145 @@ NAME_TO_TYPE = {
     "shear": "float",
 }
 
-SUPPORTED_TRANSFORMS = (
-    "Affine",
+SUPPORTED_BLURS_TRANSFORMS = (
+    # "AdvancedBlur",
+    "Blur",
+    "Defocus",
+    "GaussianBlur",
+    "GlassBlur",
+    "MedianBlur",
+    "MotionBlur",
+    "ZoomBlur",
+)
+
+
+SUPPORTED_CROP_TRANSFORMS = (
     "BBoxSafeRandomCrop",
     "CenterCrop",
-    "ChannelDropout",
-    "ChannelShuffle",
-    "CLAHE",
-    "ColorJitter",
     "Crop",
     "CropAndPad",
-    "Downscale",
-    "Equalize",
+    "RandomCrop",
+    "RandomCropFromBorders",
+    "RandomResizedCrop",
+    "RandomSizedBBoxSafeCrop",
+    "RandomSizedCrop",
+)
+
+
+SUPPORTED_GEOMETRIC_TRANSFORMS = (
+    "Affine",
+    "ElasticTransform",
     "Flip",
-    "GaussNoise",
+    "GridDistortion",
     "HorizontalFlip",
-    "ImageCompression",
-    "InvertImg",
-    "JpegCompression",
     "LongestMaxSize",
     "OpticalDistortion",
     "PadIfNeeded",
     "Perspective",
-    "PixelDropout",
-    "RandomBrightness",
-    "RandomBrightnessContrast",
-    "RandomContrast",
-    "RandomCrop",
-    "RandomCropFromBorders",
-    "RandomFog",
-    "RandomGamma",
-    # "RandomGridShuffle",
-    "RandomRain",
-    "RandomResizedCrop",
+    # "PiecewiseAffine",
     "RandomRotate90",
+    # "Rotate",
     "RandomScale",
-    "RandomSizedBBoxSafeCrop",
-    "RandomSnow",
-    "RandomToneCurve",
     "Resize",
-    "RGBShift",
+    "SafeRotate",
+    "ShiftScaleRotate",
+    "SmallestMaxSize",
     "Transpose",
     "VerticalFlip",
 )
 
+
+SUPPORTED_DROPOUT_TRANSFORMS = (
+    "ChannelDropout",
+    "CoarseDropout",
+    "Cutout",
+    # "GridDropout",
+    # "MaskDropout",
+)
+
+
+SUPPORTED_FUNCTIONAL_TRANSFORMS = (
+    "ChannelShuffle",
+    "CLAHE",
+    "ColorJitter",
+    "Downscale",
+    "Emboss",
+    "Equalize",
+    "FancyPCA",
+    "GaussNoise",
+    "HueSaturationValue",
+    "ImageCompression",
+    "InvertImg",
+    "ISONoise",
+    "JpegCompression",
+    "MultiplicativeNoise",
+    "Normalize",
+    "PixelDropout",
+    "Posterize",
+    "RandomBrightness",
+    "RandomBrightnessContrast",
+    "RandomContrast",
+    "RandomFog",
+    "RandomGamma",
+    # "RandomGravel",
+    # "RandomGridShuffle",
+    "RandomRain",
+    # "RandomShadow",
+    "RandomSnow",
+    # "RandomSunFlare",
+    "RandomToneCurve",
+    "RGBShift",
+    "RingingOvershoot",
+    "Sharpen",
+    "Solarize",
+    "Spatter",
+    "Superpixels",
+    "ToGray",
+    "ToSepia",
+    "UnsharpMask",
+)
+
+
+SUPPORTED_TRANSFORMS = (
+    *SUPPORTED_BLURS_TRANSFORMS,
+    *SUPPORTED_CROP_TRANSFORMS,
+    *SUPPORTED_GEOMETRIC_TRANSFORMS,
+    *SUPPORTED_DROPOUT_TRANSFORMS,
+    *SUPPORTED_FUNCTIONAL_TRANSFORMS,
+)
+
+
+# SUPPORTED_TRANSFORMS = (
+#     "GridDistortion",
+#     "ChannelDropout",
+#     "ChannelShuffle",
+#     "CLAHE",
+#     "ColorJitter",
+#     "Defocus",
+#     "Downscale",
+#     "Equalize",
+#     "GaussNoise",
+#     "ImageCompression",
+#     "InvertImg",
+#     "ISONoise",
+#     "JpegCompression",
+#     "PixelDropout",
+#     "RandomBrightness",
+#     "RandomBrightnessContrast",
+#     "RandomContrast",
+#     "RandomFog",
+#     "RandomGamma",
+#     # "RandomGridShuffle",
+#     "RandomRain",
+#     "RandomRotate90",
+#     "RandomSnow",
+#     "RandomToneCurve",
+#     "RGBShift",
+# )
+
 ### Embose -- Not yet supported
 ### FancyPCA -- Not yet supported
 ### HueSaturationValue -- Not yet supported
-### ISONoise -- Not yet supported
 ### Normalize -- Not yet supported
 ### Posterize -- Not yet supported
 ### RandomCropNearBBox  | Target bbox --> not yet supported
