@@ -31,7 +31,9 @@ with add_sys_path(os.path.dirname(os.path.abspath(__file__))):
     from utils import (
         _camel_to_snake,
         _create_hash,
+        _execution_mode,
         _get_image_size,
+        _get_target_view,
         _convert_bbox_to_albumentations,
         _convert_bbox_from_albumentations,
         _convert_keypoint_to_albumentations,
@@ -42,6 +44,7 @@ with add_sys_path(os.path.dirname(os.path.abspath(__file__))):
         _get_keypoints_fields,
         _get_mask_fields,
         _join_lines_with_indentation,
+        _list_target_views,
     )
 
 
@@ -331,54 +334,6 @@ def transform_sample(sample, transform, label_fields=False, new_filepath=None):
 
     sample._dataset.add_sample(new_sample)
     return new_sample.id
-
-
-def _list_target_views(ctx, inputs):
-    has_view = ctx.view != ctx.dataset.view()
-    has_selected = bool(ctx.selected)
-    default_target = "DATASET"
-    if has_view or has_selected:
-        target_choices = types.RadioGroup()
-        target_choices.add_choice(
-            "DATASET",
-            label="Entire dataset",
-            description="Run model on the entire dataset",
-        )
-
-        if has_view:
-            target_choices.add_choice(
-                "CURRENT_VIEW",
-                label="Current view",
-                description="Run model on the current view",
-            )
-            default_target = "CURRENT_VIEW"
-
-        if has_selected:
-            target_choices.add_choice(
-                "SELECTED_SAMPLES",
-                label="Selected samples",
-                description="Run model on the selected samples",
-            )
-            default_target = "SELECTED_SAMPLES"
-
-        inputs.enum(
-            "target",
-            target_choices.values(),
-            default=default_target,
-            view=target_choices,
-        )
-    else:
-        ctx.params["target"] = "DATASET"
-
-
-def _get_target_view(ctx, target):
-    if target == "SELECTED_SAMPLES":
-        return ctx.view.select(ctx.selected)
-
-    if target == "DATASET":
-        return ctx.dataset
-
-    return ctx.view
 
 
 ################################################
@@ -880,8 +835,11 @@ class AugmentWithAlbumentations(foo.Operator):
                     pass
 
         _list_target_views(ctx, inputs)
-
+        _execution_mode(ctx, inputs)
         return types.Property(inputs, view=form_view)
+    
+    def resolve_delegation(self, ctx):
+        return ctx.params.get("delegate", False)
 
     def execute(self, ctx):
         num_transforms = ctx.params.get("num_transforms", 1)
