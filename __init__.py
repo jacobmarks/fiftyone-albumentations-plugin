@@ -811,7 +811,7 @@ def get_transform_func(transform_name):
 
 
 
-def _transforms_input(ctx, inputs, num=0):
+def _transforms_from_primitive_input(ctx, inputs, num=0):
     transform_choices = list(transform_name_to_label.keys())
 
     transforms_group = types.RadioGroup()
@@ -827,6 +827,39 @@ def _transforms_input(ctx, inputs, num=0):
         view=types.AutocompleteView(),
         required=True,
     )
+    
+
+def _get_saved_transform_run_names(ctx):
+    run_keys = ctx.dataset.list_runs()
+    run_keys = [run_key for run_key in run_keys if run_key.startswith("albumentations_transform_")]
+    run_names = [ctx.dataset.get_run_info(run_key).config.name for run_key in run_keys]
+    return run_names
+
+
+def _transforms_from_saved_input(ctx, inputs, num=0):
+    run_names = _get_saved_transform_run_names(ctx)
+
+    transforms_group = types.RadioGroup()
+
+    for rn in run_names:
+        transforms_group.add_choice(rn, label=rn)
+
+    inputs.enum(
+        f"transforms__{num}",
+        transforms_group.values(),
+        label="Transform to apply",
+        description="Choose a saved transform to apply to your images",
+        view=types.DropdownView(),
+        required=True,
+    )
+
+
+def _transforms_input(ctx, inputs, num=0):
+    source = ctx.params.get(f"transform_source__{num}", None)
+    if source == "Primitive":
+        _transforms_from_primitive_input(ctx, inputs, num=num)
+    elif source == "Saved":
+        _transforms_from_saved_input(ctx, inputs, num=num)
 
 def _cleanup_last_transform(dataset):
     run_key = LAST_ALBUMENTATIONS_RUN_KEY
@@ -899,6 +932,24 @@ def _save_augmentations(ctx):
     dataset.save_run_results(run_key, results, overwrite=True)
 
 
+def _transform_source_input(ctx, inputs, num=0):
+    source_choices = ["Primitive", "Saved"]
+
+    source_choices_group = types.RadioGroup()
+
+    for choice in source_choices:
+        source_choices_group.add_choice(choice, label=choice)
+
+    inputs.enum(
+        f"transform_source__{num}",
+        source_choices_group.values(),
+        label="Transform source",
+        description="Select a transform from `Albumentations` primitives, or a saved transform",
+        view=types.TabsView(),
+        required=True,
+    )
+
+
 class AugmentWithAlbumentations(foo.Operator):
     @property
     def config(self):
@@ -926,6 +977,18 @@ class AugmentWithAlbumentations(foo.Operator):
             view=types.FieldView(),
         )
 
+         # inputs.bool(
+        #     "label_fields",
+        #     label="Label fields",
+        #     description=(
+        #         "A field or list of field names to transform. If label_fields=False, "
+        #         "no label fields are transformed. If label_fields=True, all label "
+        #         "fields are transformed.",
+        #     ),
+        #     default=False,
+        #     view=types.CheckboxView(),
+        # )
+
         inputs.int(
             "num_transforms",
             label="Number of transforms",
@@ -946,10 +1009,12 @@ class AugmentWithAlbumentations(foo.Operator):
 
         if num_transforms is not None:
             for i in range(num_transforms):
+                
                 inputs.view(
                     f"transform_{i}_header",
                     types.Header(label=f"Transform {i+1}", divider=True),
                 )
+                _transform_source_input(ctx, inputs, num=i)
                 _transforms_input(ctx, inputs, num=i)
                 transform_name = ctx.params.get(f"transforms__{i}", None)
                 try:
@@ -958,17 +1023,6 @@ class AugmentWithAlbumentations(foo.Operator):
                 except:
                     pass
         
-        # inputs.bool(
-        #     "label_fields",
-        #     label="Label fields",
-        #     description=(
-        #         "A field or list of field names to transform. If label_fields=False, "
-        #         "no label fields are transformed. If label_fields=True, all label "
-        #         "fields are transformed.",
-        #     ),
-        #     default=False,
-        #     view=types.CheckboxView(),
-        # )
 
         _list_target_views(ctx, inputs)
 
@@ -976,8 +1030,26 @@ class AugmentWithAlbumentations(foo.Operator):
 
     def execute(self, ctx):
         num_transforms = ctx.params.get("num_transforms", 1)
-        transform_names = [ctx.params.get(f"transforms__{i}", None) for i in range(num_transforms)]
-        transforms = [get_transform_func(transform_name)(ctx) for transform_name in transform_names]
+
+        transforms = []
+        for i in range (num_transforms):
+            transform_name = ctx.params.get(f"transforms__{i}", None)
+            transform_source = ctx.params.get(f"transform_source__{i}", None)
+            if transform_source == "Primitive":
+                transform = get_transform_func(transform_name)(ctx)
+                transforms.append(transform)
+            elif transform_source == "Saved":
+                run_name = transform_name
+                for run_key in ctx.dataset.list_runs():
+                    config = ctx.dataset.get_run_info(run_key).config
+                    if "name" in config.serialize() and config.name == run_name:
+                        break
+                transform_dict = ctx.dataset.get_run_info(run_key).config.transform
+                new_transforms = [
+                    A.from_dict({"transform":td})
+                    for td in transform_dict['transform']["transforms"]
+                ]
+                transforms.extend(new_transforms)
 
         transform = A.Compose(
             transforms,
@@ -1221,14 +1293,6 @@ class GetAlbumentationsRunInfo(foo.Operator):
             view=types.DropdownView(),
             required=True,
         )
-
-        run_name = ctx.params.get("run_name", None)
-        if run_name is not None:
-            run_key = name_key_map[run_name]
-            inputs.str(
-                "run_key",
-                label=run_key,
-            )
 
         view = types.View(label="Get saved Albumentations run info")
         return types.Property(inputs, view=view)
