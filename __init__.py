@@ -1155,8 +1155,7 @@ class SaveLastAlbumentationsTransform(foo.Operator):
                 "message": "To create a transform, use the `Augment with Albumentations` operator",
             }
         
-        results = ctx.dataset.load_run_results(last_run_key)
-        transform = results.config.transform
+        transform = ctx.dataset.get_run_info(last_run_key).config.transform
         name = ctx.params.get("name", None)
         _save_transform(ctx.dataset, transform, name)
         ctx.trigger("reload_dataset")
@@ -1182,9 +1181,108 @@ class SaveLastAlbumentationsAugmentations(foo.Operator):
         ctx.trigger("reload_dataset")
 
 
+
+class GetAlbumentationsRunInfo(foo.Operator):
+    @property
+    def config(self):
+        return foo.OperatorConfig(
+            name="get_albumentations_run_info",
+            label="Get info about a saved Albumentations run",
+            icon="/assets/icon.svg",
+            dynamic=True,
+        )
+
+    def resolve_input(self, ctx):
+        inputs = types.Object()
+        run_keys = ctx.dataset.list_runs()
+        run_keys = [run_key for run_key in run_keys if run_key.startswith("albumentations_transform_")]
+        rum_names = [ctx.dataset.get_run_info(run_key).config.name for run_key in run_keys]
+
+        name_key_map = {name: key for name, key in zip(rum_names, run_keys)}
+
+        if len(run_keys) == 0:
+            inputs.view(
+                "no_runs_error", 
+                types.Error(
+                    label="No saved Albumentations runs", 
+                    description="There are no saved Albumentations runs")
+            )
+            return types.Property(inputs, view=types.View())
+        
+        run_choices = types.RadioGroup()
+        for run_name in rum_names:
+            run_choices.add_choice(run_name, label=run_name)
+
+        inputs.enum(
+            "run_name",
+            run_choices.values(),
+            label="Run name",
+            description="The run key of the saved Albumentations run",
+            view=types.DropdownView(),
+            required=True,
+        )
+
+        run_name = ctx.params.get("run_name", None)
+        if run_name is not None:
+            run_key = name_key_map[run_name]
+            inputs.str(
+                "run_key",
+                label=run_key,
+            )
+
+        view = types.View(label="Get saved Albumentations run info")
+        return types.Property(inputs, view=view)
+
+    def execute(self, ctx):
+        run_name = ctx.params.get("run_name", None)
+        run_keys = ctx.dataset.list_runs()
+        run_keys = [run_key for run_key in run_keys if run_key.startswith("albumentations_transform_")]
+        for run_key in run_keys:
+            if ctx.dataset.get_run_info(run_key).config.name == run_name:
+                break
+
+        info = ctx.dataset.get_run_info(run_key)
+
+        timestamp = info.timestamp.strftime("%Y-%M-%d %H:%M:%S")
+        version = info.version
+        config = info.config.serialize()
+        config = {k: v for k, v in config.items() if v is not None}
+
+        transform = config["transform"]
+        if "transform" in transform:
+            transform = transform["transform"].copy()
+            transform.pop("bbox_params", None)
+            transform.pop("keypoint_params", None)
+            transform.pop("additional_targets", None)
+            transform.pop("is_check_shapes", None)
+
+        label_fields = config.get("label_fields", None)
+
+
+        return {
+            "timestamp": timestamp,
+            "version": version,
+            "transform": transform,
+            "label_fields": label_fields,
+        }
+
+    def resolve_output(self, ctx):
+        outputs = types.Object()
+        outputs.str("timestamp", label="Creation time")
+        outputs.str("version", label="FiftyOne version")
+        outputs.str("label_fields", label="Label fields")
+        outputs.obj("transform", label="Transform", view=types.JSONView())
+        view = types.View(label="Albumentations run info")
+        return types.Property(outputs, view=view)
+
+
 def register(plugin):
     plugin.register(AugmentWithAlbumentations)
     plugin.register(GetLastAlbumentationsRunInfo)
     plugin.register(ViewLastAlbumentationsRun)
     plugin.register(SaveLastAlbumentationsTransform)
     plugin.register(SaveLastAlbumentationsAugmentations)
+    plugin.register(GetAlbumentationsRunInfo)
+
+
+### Delete

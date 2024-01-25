@@ -10,4 +10,4 @@ operators:
   - view_last_albumentations_run
   - save_albumentations_transform
   - save_albumentations_augmentations
-  # - temp
+  - get_albumentations_run_info
