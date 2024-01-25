@@ -22,7 +22,7 @@ LAST_ALBUMENTATIONS_RUN_KEY = "_last_albumentations_run"
 ALBUMENTATIONS_RUN_INDICATOR = "albumentations_transform_"
 
 ## for camelCase to snake_case conversion
-pattern = re.compile(r'(?<!^)(?=[A-Z])')
+pattern = re.compile(r"(?<!^)(?=[A-Z])")
 
 with add_sys_path(os.path.dirname(os.path.abspath(__file__))):
     # pylint: disable=no-name-in-module,import-error
@@ -55,14 +55,13 @@ SUPPORTED_TRANSFORMS = (
 )
 
 
-################################################
-
-
 def _camel_to_snake(name):
-    return pattern.sub('_', name).lower()
+    return pattern.sub("_", name).lower()
+
 
 def serialize_view(view):
     return json.loads(json_util.dumps(view._serialize()))
+
 
 def _create_hash():
     """Get a hash of the given sample.
@@ -239,7 +238,6 @@ def _collect_masks(sample, mask_fields, detections_fields):
 
 
 def _collect_keypoints(sample, keypoints_fields):
-
     width, height = _get_image_size(sample)
 
     keypoints_dict = {}
@@ -401,7 +399,7 @@ def transform_sample(sample, transform, label_fields=False, new_filepath=None):
             for kp_id, kp in zip(transformed_keypoint_labels, transformed_keypoints)
         }
 
-    transformed_image = cv2.cvtColor(transformed_image, cv2.COLOR_RGB2BGR)  
+    transformed_image = cv2.cvtColor(transformed_image, cv2.COLOR_RGB2BGR)
     cv2.imwrite(new_filepath, transformed_image)
     new_sample = fo.Sample(filepath=new_filepath)
 
@@ -479,8 +477,10 @@ def _get_target_view(ctx, target):
 ################################################
 ######## Transformation Input Helpers ##########
 
+
 def _count_leading_spaces(line):
     return len(line) - len(line.lstrip())
+
 
 def _join_lines_with_indentation(lines):
     """
@@ -490,21 +490,21 @@ def _join_lines_with_indentation(lines):
     for line in lines:
         if not line.strip():
             continue  # Skip empty lines
-        
+
         if joined_lines:
             if _count_leading_spaces(line) > _count_leading_spaces(joined_lines[-1]):
-                joined_lines[-1] += ' ' + line.strip()
+                joined_lines[-1] += " " + line.strip()
             else:
                 joined_lines.append(line)
         else:
             joined_lines.append(line)
-    
+
     return joined_lines
 
 
 def _process_function_args(func):
     docstring = inspect.getdoc(func)
-    
+
     args_section = docstring.split("Args:")[1].split("Targets:")[0]
     args_lines = args_section.splitlines()
 
@@ -518,27 +518,25 @@ def _get_arg_type_str(arg_name_and_type):
     arg_type = "(".join(arg_name_and_type.split("(")[1:])
     arg_type = ")".join(arg_type.split(")")[:-1])
     return arg_type
-    
+
+
 def _get_arg_details(arg):
     arg_name_and_type = arg.split(":")[0].strip()
-    
+
     try:
         if "(" not in arg_name_and_type:
             arg_name = arg_name_and_type.split(":")[0].strip()
             if arg_name in NAME_TO_TYPE:
                 arg_type = NAME_TO_TYPE[arg_name]
-                arg_description = ''.join(arg.split(":")[1:]).strip()
+                arg_description = "".join(arg.split(":")[1:]).strip()
         else:
             arg_name = arg_name_and_type.split("(")[0].strip()
             arg_type = _get_arg_type_str(arg_name_and_type)
-            arg_description = ''.join(arg.split(":")[1:]).strip()
-        return {
-            "name": arg_name,
-            "type": arg_type,
-            "description": arg_description
-        }
+            arg_description = "".join(arg.split(":")[1:]).strip()
+        return {"name": arg_name, "type": arg_type, "description": arg_description}
     except:
         return None
+
 
 def tuple_creator(inputs, arg_type):
     def input_adder(name, **input_args):
@@ -555,69 +553,61 @@ def tuple_creator(inputs, arg_type):
             first_input_args["required"] = False
             second_input_args["default"] = default[1]
             second_input_args["required"] = False
-        
 
         obj = types.Object()
-        constructor = obj.float if arg_type == 'float' else obj.int
-        constructor(
-            "first",
-            **first_input_args
-        )
-        constructor(
-            "second",
-            **second_input_args
-        )
+        constructor = obj.float if arg_type == "float" else obj.int
+        constructor("first", **first_input_args)
+        constructor("second", **second_input_args)
         inputs.define_property(name, obj, **input_args)
+
     return input_adder
 
 
 def _get_input_factory(inputs, arg_type):
-    if arg_type == 'bool':
+    if arg_type == "bool":
         return inputs.bool
-    elif arg_type == 'int':
+    elif arg_type == "int":
         return inputs.int
-    elif arg_type == 'float':
+    elif arg_type == "float":
         return inputs.float
-    elif arg_type == 'str':
+    elif arg_type == "str":
         return inputs.str
-    elif 'int, int' in arg_type:
-        return tuple_creator(inputs, 'int')
-    elif 'float, float' in arg_type:
-        return tuple_creator(inputs, 'float')
-    elif 'tuple of int' in arg_type:
-        return tuple_creator(inputs, 'int')
-    elif 'tuple of float' in arg_type:
-        return tuple_creator(inputs, 'float')
+    elif "int, int" in arg_type:
+        return tuple_creator(inputs, "int")
+    elif "float, float" in arg_type:
+        return tuple_creator(inputs, "float")
+    elif "tuple of int" in arg_type:
+        return tuple_creator(inputs, "int")
+    elif "tuple of float" in arg_type:
+        return tuple_creator(inputs, "float")
     elif arg_type == "int, list of int":
         ## doesn't support list of int yet
         return inputs.int
-    elif arg_type == 'int, float':
+    elif arg_type == "int, float":
         return inputs.float
-    elif arg_type == '(float, float) or float':
+    elif arg_type == "(float, float) or float":
         ## doesn't support tuple yet
         return inputs.float
-    elif arg_type == '(int, int) or int':
+    elif arg_type == "(int, int) or int":
         ## doesn't support tuple yet
         return inputs.int
-    elif 'float,' in arg_type or 'float or' in arg_type:
+    elif "float," in arg_type or "float or" in arg_type:
         ## doesn't support tuple yet
         return inputs.float
-    elif 'number,' in arg_type or 'number or' in arg_type:
+    elif "number," in arg_type or "number or" in arg_type:
         ## doesn't support tuple yet
         return inputs.float
     return None
 
 
-
-
 def _add_transform_inputs(inputs, transform_name):
     transform_args = _process_function_args(getattr(A, transform_name))
-    
+
     t = getattr(A, transform_name)
     camel_case_name = _camel_to_snake(transform_name)
 
     parameters = inspect.signature(t).parameters
-    
+
     for arg in transform_args:
         default = None
         arg_name = arg["name"]
@@ -638,24 +628,22 @@ def _add_transform_inputs(inputs, transform_name):
         elif default is None:
             input_args["required"] = False
 
-
         input_factory = _get_input_factory(inputs, arg_type)
         if input_factory is not None:
-            input_factory(
-                f"{camel_case_name}__{arg_name}",
-                **input_args
-            )
+            input_factory(f"{camel_case_name}__{arg_name}", **input_args)
+
 
 ################################################
 ################################################
 ######## Transformation Creation Helpers #######
-    
+
+
 def _extract_transform_inputs(ctx, transform_name):
     prefix = _camel_to_snake(transform_name) + "__"
     transform_params = {}
     for param in ctx.params:
         if param.startswith(prefix):
-            param_name = param[len(prefix):]
+            param_name = param[len(prefix) :]
             transform_params[param_name] = ctx.params[param]
     return transform_params
 
@@ -685,7 +673,10 @@ def _create_transform(ctx, transform_name):
     for param_name, param in params.items():
         if param_name in input_dict:
             if param.default != inspect._empty:
-                if input_dict[param_name] != None and input_dict[param_name] is not None:
+                if (
+                    input_dict[param_name] != None
+                    and input_dict[param_name] is not None
+                ):
                     kwargs[param_name] = input_dict[param_name]
             else:
                 args.append(input_dict[param_name])
@@ -695,8 +686,8 @@ def _create_transform(ctx, transform_name):
     return t(*args, **kwargs)
 
 
-
 ####### Unifying functions #######
+
 
 def get_input_parser(transform_name):
     function_name = f"_{transform_name}_input"
@@ -705,7 +696,9 @@ def get_input_parser(transform_name):
         input_parser_function = globals()[function_name]
     else:
         # Define the function dynamically using a lambda function
-        input_parser_function = lambda ctx, inputs: _add_transform_inputs(inputs, transform_name)
+        input_parser_function = lambda ctx, inputs: _add_transform_inputs(
+            inputs, transform_name
+        )
     return input_parser_function
 
 
@@ -722,7 +715,11 @@ def get_transform_func(transform_name):
 
 def _get_albumentations_run_names(ctx):
     run_keys = ctx.dataset.list_runs()
-    run_keys = [run_key for run_key in run_keys if run_key.startswith(ALBUMENTATIONS_RUN_INDICATOR)]
+    run_keys = [
+        run_key
+        for run_key in run_keys
+        if run_key.startswith(ALBUMENTATIONS_RUN_INDICATOR)
+    ]
     run_names = [ctx.dataset.get_run_info(run_key).config.name for run_key in run_keys]
     return run_names
 
@@ -742,22 +739,31 @@ def _transforms_from_primitive_input(ctx, inputs, num=0):
         view=types.AutocompleteView(),
         required=True,
     )
-    
+
 
 def _get_saved_transform_run_names(ctx):
     run_keys = ctx.dataset.list_runs()
-    run_keys = [run_key for run_key in run_keys if run_key.startswith(ALBUMENTATIONS_RUN_INDICATOR)]
+    run_keys = [
+        run_key
+        for run_key in run_keys
+        if run_key.startswith(ALBUMENTATIONS_RUN_INDICATOR)
+    ]
     run_names = [ctx.dataset.get_run_info(run_key).config.name for run_key in run_keys]
     return run_names
 
 
 def _get_run_key_from_name(ctx, run_name):
     run_keys = ctx.dataset.list_runs()
-    run_keys = [run_key for run_key in run_keys if run_key.startswith(ALBUMENTATIONS_RUN_INDICATOR)]
+    run_keys = [
+        run_key
+        for run_key in run_keys
+        if run_key.startswith(ALBUMENTATIONS_RUN_INDICATOR)
+    ]
     for run_key in run_keys:
         if ctx.dataset.get_run_info(run_key).config.name == run_name:
             break
     return run_key
+
 
 def _format_transform(config):
     transform = config.get("transform", {})
@@ -768,7 +774,6 @@ def _format_transform(config):
         transform.pop("additional_targets", None)
         transform.pop("is_check_shapes", None)
     return transform
-
 
 
 def _execute_run_info(ctx, run_key):
@@ -782,13 +787,23 @@ def _execute_run_info(ctx, run_key):
 
     label_fields = config.get("label_fields", None)
 
-
     return {
         "timestamp": timestamp,
         "version": version,
         "transform": transform,
         "label_fields": label_fields,
     }
+
+
+def _initialize_run_output(ctx, run_key=False):
+    outputs = types.Object()
+    if run_key:
+        outputs.str("run_key", label="Run key")
+    outputs.str("timestamp", label="Creation time")
+    outputs.str("version", label="FiftyOne version")
+    outputs.str("label_fields", label="Label fields")
+    outputs.obj("transform", label="Transform", view=types.JSONView())
+    return outputs
 
 
 def _transforms_from_saved_input(ctx, inputs, num=0):
@@ -816,6 +831,7 @@ def _transforms_input(ctx, inputs, num=0):
     elif source == "Saved":
         _transforms_from_saved_input(ctx, inputs, num=num)
 
+
 def _cleanup_last_transform(dataset):
     run_key = LAST_ALBUMENTATIONS_RUN_KEY
 
@@ -832,12 +848,13 @@ def _cleanup_last_transform(dataset):
     fps = dataset.select(ids).values("filepath")
     for fp in fps:
         os.remove(fp)
-    
+
     dataset.delete_samples(ids)
 
 
-
-def _store_last_transform(transform, dataset, target_view, label_fields, new_sample_ids):
+def _store_last_transform(
+    transform, dataset, target_view, label_fields, new_sample_ids
+):
     _cleanup_last_transform(dataset)
     run_key = LAST_ALBUMENTATIONS_RUN_KEY
     transform_dict = transform.to_dict()
@@ -852,7 +869,7 @@ def _store_last_transform(transform, dataset, target_view, label_fields, new_sam
     else:
         dataset.update_run_config(run_key, config)
         results = dataset.load_run_results(run_key)
-    
+
     results.target_view = target_view._serialize()
     results.new_sample_ids = new_sample_ids
     results.save_augmentations = False
@@ -881,7 +898,7 @@ def _save_augmentations(ctx):
 
     if run_key not in dataset.list_runs():
         return
-    
+
     results = dataset.load_run_results(run_key)
     results.save_augmentations = True
     dataset.save_run_results(run_key, results, overwrite=True)
@@ -932,7 +949,7 @@ class AugmentWithAlbumentations(foo.Operator):
             view=types.FieldView(),
         )
 
-         # inputs.bool(
+        # inputs.bool(
         #     "label_fields",
         #     label="Label fields",
         #     description=(
@@ -955,16 +972,16 @@ class AugmentWithAlbumentations(foo.Operator):
         num_transforms = ctx.params.get("num_transforms", 1)
         if num_transforms is not None and num_transforms < 1:
             inputs.view(
-                "no_transforms_error", 
+                "no_transforms_error",
                 types.Error(
-                    label="No transforms", 
-                    description="The number of transforms must be greater than 0")
+                    label="No transforms",
+                    description="The number of transforms must be greater than 0",
+                ),
             )
             return types.Property(inputs, view=form_view)
 
         if num_transforms is not None:
             for i in range(num_transforms):
-                
                 inputs.view(
                     f"transform_{i}_header",
                     types.Header(label=f"Transform {i+1}", divider=True),
@@ -977,7 +994,6 @@ class AugmentWithAlbumentations(foo.Operator):
                     transform_input_parser(ctx, inputs)
                 except:
                     pass
-        
 
         _list_target_views(ctx, inputs)
 
@@ -987,7 +1003,7 @@ class AugmentWithAlbumentations(foo.Operator):
         num_transforms = ctx.params.get("num_transforms", 1)
 
         transforms = []
-        for i in range (num_transforms):
+        for i in range(num_transforms):
             transform_name = ctx.params.get(f"transforms__{i}", None)
             transform_source = ctx.params.get(f"transform_source__{i}", None)
             if transform_source == "Primitive":
@@ -1001,8 +1017,8 @@ class AugmentWithAlbumentations(foo.Operator):
                         break
                 transform_dict = ctx.dataset.get_run_info(run_key).config.transform
                 new_transforms = [
-                    A.from_dict({"transform":td})
-                    for td in transform_dict['transform']["transforms"]
+                    A.from_dict({"transform": td})
+                    for td in transform_dict["transform"]["transforms"]
                 ]
                 transforms.extend(new_transforms)
 
@@ -1013,8 +1029,6 @@ class AugmentWithAlbumentations(foo.Operator):
                 format="xy", label_fields=["keypoint_labels"], remove_invisible=True
             ),
         )
-
-        
 
         num_augs = ctx.params.get("num_augs", 1)
 
@@ -1030,7 +1044,9 @@ class AugmentWithAlbumentations(foo.Operator):
                 new_sample_id = transform_sample(sample, transform, label_fields)
                 new_sample_ids.append(new_sample_id)
 
-        _store_last_transform(transform, ctx.dataset, target_view, label_fields, new_sample_ids)
+        _store_last_transform(
+            transform, ctx.dataset, target_view, label_fields, new_sample_ids
+        )
         ctx.trigger("reload_dataset")
 
 
@@ -1046,18 +1062,18 @@ class GetLastAlbumentationsRunInfo(foo.Operator):
 
     def resolve_input(self, ctx):
         inputs = types.Object()
-        
+
         if LAST_ALBUMENTATIONS_RUN_KEY not in ctx.dataset.list_runs():
             inputs.view(
-                "warning", 
+                "warning",
                 types.Warning(
-                    label="No Albumentations runs yet!", 
-                    description="To create a transform, use the `Augment with Albumentations` operator"
-                    )
+                    label="No Albumentations runs yet!",
+                    description="To create a transform, use the `Augment with Albumentations` operator",
+                ),
             )
-            inputs.str("run_key", required=True, view = types.HiddenView())
-            return types.Property(inputs, view = types.View())
-        
+            inputs.str("run_key", required=True, view=types.HiddenView())
+            return types.Property(inputs, view=types.View())
+
         view = types.View(label="Get last Albumentations run info")
         return types.Property(inputs, view=view)
 
@@ -1066,15 +1082,10 @@ class GetLastAlbumentationsRunInfo(foo.Operator):
         return _execute_run_info(ctx, run_key)
 
     def resolve_output(self, ctx):
-        outputs = types.Object()
-        
-        outputs.str("timestamp", label="Creation time")
-        outputs.str("version", label="FiftyOne version")
-        outputs.str("label_fields", label="Label fields")
-        outputs.obj("transform", label="Transform", view=types.JSONView())
+        outputs = _initialize_run_output(ctx)
         view = types.View(label="Last Albumentations run info")
         return types.Property(outputs, view=view)
-    
+
 
 class ViewLastAlbumentationsRun(foo.Operator):
     @property
@@ -1098,7 +1109,7 @@ class ViewLastAlbumentationsRun(foo.Operator):
             return {
                 "message": "To create a transform, use the `Augment with Albumentations` operator",
             }
-        
+
         results = ctx.dataset.load_run_results(run_key)
         new_sample_ids = results.new_sample_ids
         view = ctx.dataset.select(new_sample_ids)
@@ -1107,6 +1118,7 @@ class ViewLastAlbumentationsRun(foo.Operator):
             "set_view",
             params=dict(view=serialize_view(view)),
         )
+
 
 class SaveLastAlbumentationsTransform(foo.Operator):
     @property
@@ -1155,7 +1167,7 @@ class SaveLastAlbumentationsTransform(foo.Operator):
             return {
                 "message": "To create a transform, use the `Augment with Albumentations` operator",
             }
-        
+
         transform = ctx.dataset.get_run_info(last_run_key).config.transform
         name = ctx.params.get("name", None)
         _save_transform(ctx.dataset, transform, name)
@@ -1182,8 +1194,6 @@ class SaveLastAlbumentationsAugmentations(foo.Operator):
         ctx.trigger("reload_dataset")
 
 
-
-
 class GetAlbumentationsRunInfo(foo.Operator):
     @property
     def config(self):
@@ -1200,14 +1210,15 @@ class GetAlbumentationsRunInfo(foo.Operator):
 
         if len(run_names) == 0:
             inputs.view(
-                "no_runs_error", 
+                "no_runs_error",
                 types.Error(
-                    label="No saved Albumentations runs", 
-                    description="To create a transform, use the `Augment with Albumentations` operator")
+                    label="No saved Albumentations runs",
+                    description="To create a transform, use the `Augment with Albumentations` operator",
+                ),
             )
-            inputs.str("run_key", required=True, view = types.HiddenView())
+            inputs.str("run_key", required=True, view=types.HiddenView())
             return types.Property(inputs, view=types.View())
-        
+
         run_choices = types.RadioGroup()
         for run_name in run_names:
             run_choices.add_choice(run_name, label=run_name)
@@ -1230,13 +1241,57 @@ class GetAlbumentationsRunInfo(foo.Operator):
         return _execute_run_info(ctx, run_key)
 
     def resolve_output(self, ctx):
-        outputs = types.Object()
-        outputs.str("timestamp", label="Creation time")
-        outputs.str("version", label="FiftyOne version")
-        outputs.str("label_fields", label="Label fields")
-        outputs.obj("transform", label="Transform", view=types.JSONView())
+        outputs = _initialize_run_output(ctx)
         view = types.View(label="Albumentations run info")
         return types.Property(outputs, view=view)
+    
+
+class DeleteAlbumentationsRun(foo.Operator):
+    @property
+    def config(self):
+        return foo.OperatorConfig(
+            name="delete_albumentations_run",
+            label="Delete Albumentations run",
+            icon="/assets/icon.svg",
+            dynamic=True,
+        )
+
+    def resolve_input(self, ctx):
+        inputs = types.Object()
+        run_names = _get_albumentations_run_names(ctx)
+
+        if len(run_names) == 0:
+            inputs.view(
+                "no_runs_error",
+                types.Error(
+                    label="No saved Albumentations runs",
+                    description="To create a transform, use the `Augment with Albumentations` operator",
+                ),
+            )
+            inputs.str("run_key", required=True, view=types.HiddenView())
+            return types.Property(inputs, view=types.View())
+
+        run_choices = types.RadioGroup()
+        for run_name in run_names:
+            run_choices.add_choice(run_name, label=run_name)
+
+        inputs.enum(
+            "run_name",
+            run_choices.values(),
+            label="Run name",
+            description="The run key of the saved Albumentations run",
+            view=types.DropdownView(),
+            required=True,
+        )
+
+        view = types.View(label="Delete saved Albumentations run")
+        return types.Property(inputs, view=view)
+
+    def execute(self, ctx):
+        run_name = ctx.params.get("run_name", None)
+        run_key = _get_run_key_from_name(ctx, run_name)
+        ctx.dataset.delete_run(run_key)
+        ctx.trigger("reload_dataset")
 
 
 def register(plugin):
@@ -1246,6 +1301,7 @@ def register(plugin):
     plugin.register(SaveLastAlbumentationsTransform)
     plugin.register(SaveLastAlbumentationsAugmentations)
     plugin.register(GetAlbumentationsRunInfo)
+    plugin.register(DeleteAlbumentationsRun)
 
 
 ### Delete
