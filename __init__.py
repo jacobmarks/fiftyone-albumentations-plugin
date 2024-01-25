@@ -518,19 +518,31 @@ def _get_arg_details(arg):
         return None
 
 def tuple_creator(inputs, arg_type):
-    ## add in defaults...
     def input_adder(name, **input_args):
+        default = input_args.pop("default", None)
+
+        first_input_args = {
+            "view": types.FieldView(space=3),
+        }
+        second_input_args = {
+            "view": types.FieldView(space=3),
+        }
+        if default is not None and type(default) == tuple and len(default) == 2:
+            first_input_args["default"] = default[0]
+            first_input_args["required"] = False
+            second_input_args["default"] = default[1]
+            second_input_args["required"] = False
+        
+
         obj = types.Object()
         constructor = obj.float if arg_type == 'float' else obj.int
         constructor(
             "first",
-            view=types.FieldView(space=3),
-            required=True,
+            **first_input_args
         )
         constructor(
             "second",
-            view=types.FieldView(space=3),
-            required=True,
+            **second_input_args
         )
         inputs.define_property(name, obj, **input_args)
     return input_adder
@@ -597,9 +609,11 @@ def _add_transform_inputs(inputs, transform_name):
 
         if arg_name in parameters:
             default = parameters[arg_name].default
-        if default is not None and default != None and default != inspect._empty and str(type(default)) != 'tuple':
+        if default is not None and default != None and default != inspect._empty: # and str(type(default)) != 'tuple':
             input_args["default"] = default
             input_args["required"] = False
+        # elif str(type(default)) == 'tuple':
+        #     input_args["default"] = default
         elif default is None:
             input_args["required"] = False
 
