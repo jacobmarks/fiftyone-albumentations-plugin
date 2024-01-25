@@ -609,11 +609,9 @@ def _add_transform_inputs(inputs, transform_name):
 
         if arg_name in parameters:
             default = parameters[arg_name].default
-        if default is not None and default != None and default != inspect._empty: # and str(type(default)) != 'tuple':
+        if default is not None and default != None and default != inspect._empty:
             input_args["default"] = default
             input_args["required"] = False
-        # elif str(type(default)) == 'tuple':
-        #     input_args["default"] = default
         elif default is None:
             input_args["required"] = False
 
@@ -813,7 +811,7 @@ def get_transform_func(transform_name):
 
 
 
-def _transforms_input(ctx, inputs):
+def _transforms_input(ctx, inputs, num=0):
     transform_choices = list(transform_name_to_label.keys())
 
     transforms_group = types.RadioGroup()
@@ -822,18 +820,13 @@ def _transforms_input(ctx, inputs):
         transforms_group.add_choice(tc, label=transform_name_to_label[tc])
 
     inputs.enum(
-        "transforms",
+        f"transforms__{num}",
         transforms_group.values(),
         label="Transform to apply",
         description="The Albumentations transform to apply to your images",
         view=types.AutocompleteView(),
         required=True,
     )
-
-    # x = ctx.params.get("tmp", None)
-    # if x is not None:
-    #     inputs.str("mamama", label=str(x["name"]))
-
 
 def _cleanup_last_transform(dataset):
     run_key = LAST_ALBUMENTATIONS_RUN_KEY
@@ -925,16 +918,6 @@ class AugmentWithAlbumentations(foo.Operator):
             description="Apply an Albumentations transform to the image and all label fields listed for the sample.",
         )
 
-        _transforms_input(ctx, inputs)
-
-        transform_name = ctx.params.get("transforms", None)
-
-        try:
-            transform_input_parser = get_input_parser(transform_name)
-            transform_input_parser(ctx, inputs)
-        except:
-            pass
-
         inputs.int(
             "num_augs",
             label="Number of augmentations per sample",
@@ -943,6 +926,38 @@ class AugmentWithAlbumentations(foo.Operator):
             view=types.FieldView(),
         )
 
+        inputs.int(
+            "num_transforms",
+            label="Number of transforms",
+            description="The number of transforms to compose and apply to samples",
+            default=1,
+            required=True,
+        )
+
+        num_transforms = ctx.params.get("num_transforms", 1)
+        if num_transforms is not None and num_transforms < 1:
+            inputs.view(
+                "no_transforms_error", 
+                types.Error(
+                    label="No transforms", 
+                    description="The number of transforms must be greater than 0")
+            )
+            return types.Property(inputs, view=form_view)
+
+        if num_transforms is not None:
+            for i in range(num_transforms):
+                inputs.view(
+                    f"transform_{i}_header",
+                    types.Header(label=f"Transform {i+1}", divider=True),
+                )
+                _transforms_input(ctx, inputs, num=i)
+                transform_name = ctx.params.get(f"transforms__{i}", None)
+                try:
+                    transform_input_parser = get_input_parser(transform_name)
+                    transform_input_parser(ctx, inputs)
+                except:
+                    pass
+        
         # inputs.bool(
         #     "label_fields",
         #     label="Label fields",
@@ -960,15 +975,12 @@ class AugmentWithAlbumentations(foo.Operator):
         return types.Property(inputs, view=form_view)
 
     def execute(self, ctx):
-        transform_name = ctx.params.get("transforms", None)
-        
-        transform_func = get_transform_func(transform_name)
-        transform = transform_func(ctx)
+        num_transforms = ctx.params.get("num_transforms", 1)
+        transform_names = [ctx.params.get(f"transforms__{i}", None) for i in range(num_transforms)]
+        transforms = [get_transform_func(transform_name)(ctx) for transform_name in transform_names]
 
         transform = A.Compose(
-            [
-                transform,
-            ],
+            transforms,
             bbox_params=A.BboxParams(format="albumentations"),
             keypoint_params=A.KeypointParams(
                 format="xy", label_fields=["keypoint_labels"], remove_invisible=True
@@ -1176,16 +1188,3 @@ def register(plugin):
     plugin.register(ViewLastAlbumentationsRun)
     plugin.register(SaveLastAlbumentationsTransform)
     plugin.register(SaveLastAlbumentationsAugmentations)
-
-
-
-### To Do:
-## Delete transform
-## See saved transforms
-## compose transforms
-## Export transform
-## Rerun last transform
-## Add in more base transforms
-
-## Document with README
-## Blog post
