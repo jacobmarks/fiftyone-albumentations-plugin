@@ -1303,5 +1303,3 @@ def register(plugin):
     plugin.register(GetAlbumentationsRunInfo)
     plugin.register(DeleteAlbumentationsRun)
 
-
-### Delete
