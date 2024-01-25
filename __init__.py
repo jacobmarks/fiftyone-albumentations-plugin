@@ -34,6 +34,71 @@ NAME_TO_TYPE = {
     "shear": "float",
 }
 
+SUPPORTED_TRANSFORMS = (
+    "Affine",
+    "BBoxSafeRandomCrop",
+    "CenterCrop",
+    "ChannelDropout",
+    "ChannelShuffle",
+    "CLAHE",
+    "ColorJitter",
+    "Crop",
+    "CropAndPad",
+    "Downscale",
+    "Equalize",
+    "Flip",
+    "GaussNoise",
+    "HorizontalFlip",
+    "ImageCompression",
+    "InvertImg",
+    "JpegCompression",
+    "LongestMaxSize",
+    "OpticalDistortion",
+    "PadIfNeeded",
+    "Perspective",
+    "PixelDropout",
+    "RandomBrightness",
+    "RandomBrightnessContrast",
+    "RandomContrast",
+    "RandomCrop",
+    "RandomCropFromBorders",
+    "RandomFog",
+    "RandomGamma",
+    # "RandomGridShuffle",
+    "RandomRain",
+    "RandomResizedCrop",
+    "RandomRotate90",
+    "RandomScale",
+    "RandomSizedBBoxSafeCrop",
+    "RandomSnow",
+    "RandomToneCurve",
+    "Resize",
+    "RGBShift",
+    "Transpose",
+    "VerticalFlip",
+)
+
+### Embose -- Not yet supported
+### FancyPCA -- Not yet supported
+### HueSaturationValue -- Not yet supported
+### ISONoise -- Not yet supported
+### Normalize -- Not yet supported
+### Posterize -- Not yet supported
+### RandomCropNearBBox  | Target bbox --> not yet supported
+### RandomGravel -- Not yet supported
+### RandomShadow -- Not yet supported
+### RandomSunFlare -- Not yet supported
+### RingingOvershoot -- Not yet supported
+### Rotate -- Not yet supported
+### Sharpen -- Not yet supported
+### ShiftScaleRotate -- Not yet supported
+### Solarize -- Not yet supported
+### Spatter -- Not yet supported
+### Superpixels -- Not yet supported
+
+
+################################################
+
 
 def _camel_to_snake(name):
     return pattern.sub('_', name).lower()
@@ -676,14 +741,6 @@ def _create_transform(ctx, transform_name):
 ################################################
 ################# Transformations ##############
 
-### Embose -- Not yet supported
-### FancyPCA -- Not yet supported
-### HueSaturationValue -- Not yet supported
-### ISONoise -- Not yet supported
-### Normalize -- Not yet supported
-### Posterize -- Not yet supported
-### RandomCropNearBBox  | Target bbox --> not yet supported
-### RandomGravel -- Not yet supported
 
 
 ### RandomGridShuffle
@@ -716,75 +773,19 @@ def _create_transform(ctx, transform_name):
 ### RandomRain
 
 ### DON'T REMOVE
-def _random_rain_input(ctx, inputs):
+def _RandomRain_input(ctx, inputs):
     _add_transform_inputs(inputs, "RandomRain")
     ## drop color not supported yet
     ## rain type not supported yet
 
-def _random_rain_transform(ctx):
+def _RandomRain_transform(ctx):
     return _create_transform(ctx, "RandomRain")
 
 
-### RandomShadow -- Not yet supported
-### RandomSunFlare -- Not yet supported
-### RingingOvershoot -- Not yet supported
-### Rotate -- Not yet supported
-### Sharpen -- Not yet supported
-### ShiftScaleRotate -- Not yet supported
-### Solarize -- Not yet supported
-### Spatter -- Not yet supported
-### Superpixels -- Not yet supported
 
 
 
 ####### Unifying functions #######
-
-### The camel case conversion should superseed this
-transform_name_to_label = {
-    "affine": "Affine",
-    "bbox_safe_random_crop": "BBoxSafeRandomCrop",
-    "center_crop": "CenterCrop",
-    "channel_dropout": "ChannelDropout",
-    "channel_shuffle": "ChannelShuffle",
-    "clahe": "CLAHE",
-    "color_jitter": "ColorJitter",
-    "crop": "Crop",
-    "crop_and_pad": "CropAndPad",
-    "downscale": "Downscale",
-    "equalize": "Equalize",
-    "flip": "Flip",
-    "gauss_noise": "GaussNoise",
-    "horizontal_flip": "HorizontalFlip",
-    "image_compression": "ImageCompression",
-    "invert_img": "InvertImg",
-    "jpeg_compression": "JpegCompression",
-    "longest_max_size": "LongestMaxSize",
-    "optical_distortion": "OpticalDistortion",
-    "pad_if_needed": "PadIfNeeded",
-    "perspective": "Perspective",
-    "pixel_dropout": "PixelDropout",
-    "random_brightness": "RandomBrightness",
-    "random_brightness_contrast": "RandomBrightnessContrast",
-    "random_contrast": "RandomContrast",
-    "random_crop": "RandomCrop",
-    "random_crop_from_borders": "RandomCropFromBorders",
-    # "random_crop_near_bbox": "RandomCropNearBBox",
-    "random_fog": "RandomFog",
-    "random_gamma": "RandomGamma",
-    "random_grid_shuffle": "RandomGridShuffle",
-    "random_rain": "RandomRain",
-    "random_resized_crop": "RandomResizedCrop",
-    "random_rotate90": "RandomRotate90",
-    "random_scale": "RandomScale",
-    "random_sized_bbox_safe_crop": "RandomSizedBBoxSafeCrop",
-    "random_snow": "RandomSnow",
-    "random_tone_curve": "RandomToneCurve",
-    "resize": "Resize",
-    "rgb_shift": "RGBShift",
-    "transpose": "Transpose",
-    "vertical_flip": "VerticalFlip",
-}
-
 
 def get_input_parser(transform_name):
     function_name = f"_{transform_name}_input"
@@ -792,9 +793,8 @@ def get_input_parser(transform_name):
         # Defined explicitly above
         input_parser_function = globals()[function_name]
     else:
-        label = transform_name_to_label[transform_name]
         # Define the function dynamically using a lambda function
-        input_parser_function = lambda ctx, inputs: _add_transform_inputs(inputs, label)
+        input_parser_function = lambda ctx, inputs: _add_transform_inputs(inputs, transform_name)
     return input_parser_function
 
 
@@ -804,20 +804,18 @@ def get_transform_func(transform_name):
         # Defined explicitly above
         transform_function = globals()[function_name]
     else:
-        label = transform_name_to_label[transform_name]
         # Define the function dynamically using a lambda function
-        transform_function = lambda ctx: _create_transform(ctx, label)
+        transform_function = lambda ctx: _create_transform(ctx, transform_name)
     return transform_function
 
 
 
 def _transforms_from_primitive_input(ctx, inputs, num=0):
-    transform_choices = list(transform_name_to_label.keys())
-
+    transform_choices = SUPPORTED_TRANSFORMS
     transforms_group = types.RadioGroup()
 
     for tc in transform_choices:
-        transforms_group.add_choice(tc, label=transform_name_to_label[tc])
+        transforms_group.add_choice(tc, label=tc)
 
     inputs.enum(
         f"transforms__{num}",
