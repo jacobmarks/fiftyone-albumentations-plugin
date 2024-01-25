@@ -759,6 +759,37 @@ def _get_run_key_from_name(ctx, run_name):
             break
     return run_key
 
+def _format_transform(config):
+    transform = config.get("transform", {})
+    if "transform" in transform:
+        transform = transform["transform"].copy()
+        transform.pop("bbox_params", None)
+        transform.pop("keypoint_params", None)
+        transform.pop("additional_targets", None)
+        transform.pop("is_check_shapes", None)
+    return transform
+
+
+
+def _execute_run_info(ctx, run_key):
+    info = ctx.dataset.get_run_info(run_key)
+
+    timestamp = info.timestamp.strftime("%Y-%M-%d %H:%M:%S")
+    version = info.version
+    config = info.config.serialize()
+    config = {k: v for k, v in config.items() if v is not None}
+    transform = _format_transform(config)
+
+    label_fields = config.get("label_fields", None)
+
+
+    return {
+        "timestamp": timestamp,
+        "version": version,
+        "transform": transform,
+        "label_fields": label_fields,
+    }
+
 
 def _transforms_from_saved_input(ctx, inputs, num=0):
     run_names = _get_saved_transform_run_names(ctx)
@@ -1032,34 +1063,7 @@ class GetLastAlbumentationsRunInfo(foo.Operator):
 
     def execute(self, ctx):
         run_key = LAST_ALBUMENTATIONS_RUN_KEY
-
-        if run_key not in ctx.dataset.list_runs():
-            return {
-                "message": "To create a transform, use the `Augment with Albumentations` operator",
-            }
-
-        info = ctx.dataset.get_run_info(run_key)
-
-        timestamp = info.timestamp.strftime("%Y-%M-%d %H:%M:%S")
-        config = info.config.serialize()
-        config = {k: v for k, v in config.items() if v is not None}
-
-        transform = config.get("transform", {})
-        if "transform" in transform:
-            transform = transform["transform"].copy()
-            transform.pop("bbox_params", None)
-            transform.pop("keypoint_params", None)
-            transform.pop("additional_targets", None)
-            transform.pop("is_check_shapes", None)
-
-        label_fields = config.get("label_fields", None)
-
-        return {
-            "timestamp": timestamp,
-            "version": info.version,
-            "label_fields": label_fields,
-            "transform": transform,
-        }
+        return _execute_run_info(ctx, run_key)
 
     def resolve_output(self, ctx):
         outputs = types.Object()
@@ -1104,7 +1108,6 @@ class ViewLastAlbumentationsRun(foo.Operator):
             params=dict(view=serialize_view(view)),
         )
 
-
 class SaveLastAlbumentationsTransform(foo.Operator):
     @property
     def config(self):
@@ -1125,13 +1128,7 @@ class SaveLastAlbumentationsTransform(foo.Operator):
         config = info.config.serialize()
         config = {k: v for k, v in config.items() if v is not None}
 
-        transform = config.get("transform", {})
-        if "transform" in transform:
-            transform = transform["transform"].copy()
-            transform.pop("bbox_params", None)
-            transform.pop("keypoint_params", None)
-            transform.pop("additional_targets", None)
-            transform.pop("is_check_shapes", None)
+        transform = _format_transform(config)
 
         inputs.obj(
             "transform",
@@ -1184,6 +1181,9 @@ class SaveLastAlbumentationsAugmentations(foo.Operator):
         _save_augmentations(ctx)
         ctx.trigger("reload_dataset")
 
+
+
+
 class GetAlbumentationsRunInfo(foo.Operator):
     @property
     def config(self):
@@ -1227,30 +1227,7 @@ class GetAlbumentationsRunInfo(foo.Operator):
     def execute(self, ctx):
         run_name = ctx.params.get("run_name", None)
         run_key = _get_run_key_from_name(ctx, run_name)
-        info = ctx.dataset.get_run_info(run_key)
-
-        timestamp = info.timestamp.strftime("%Y-%M-%d %H:%M:%S")
-        version = info.version
-        config = info.config.serialize()
-        config = {k: v for k, v in config.items() if v is not None}
-
-        transform = config["transform"]
-        if "transform" in transform:
-            transform = transform["transform"].copy()
-            transform.pop("bbox_params", None)
-            transform.pop("keypoint_params", None)
-            transform.pop("additional_targets", None)
-            transform.pop("is_check_shapes", None)
-
-        label_fields = config.get("label_fields", None)
-
-
-        return {
-            "timestamp": timestamp,
-            "version": version,
-            "transform": transform,
-            "label_fields": label_fields,
-        }
+        return _execute_run_info(ctx, run_key)
 
     def resolve_output(self, ctx):
         outputs = types.Object()
