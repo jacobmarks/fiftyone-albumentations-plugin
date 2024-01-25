@@ -10,12 +10,33 @@ import numpy as np
 import json
 from bson import json_util
 import os
+import inspect
+import re
 
 import fiftyone as fo
 import fiftyone.operators as foo
 from fiftyone.operators import types
 
 LAST_ALBUMENTATIONS_RUN_KEY = "_last_albumentations_run"
+
+## for camelCase to snake_case conversion
+pattern = re.compile(r'(?<!^)(?=[A-Z])')
+
+NAME_TO_TYPE = {
+    "scale": "float",
+    "slant_lower": "int",
+    "slant_upper": "int",
+    "drop_length": "int",
+    "drop_width": "int",
+    "translate_percent": "float",
+    "translate_px": "int",
+    "rotate": "float",
+    "shear": "float",
+}
+
+
+def _camel_to_snake(name):
+    return pattern.sub('_', name).lower()
 
 def serialize_view(view):
     return json.loads(json_util.dumps(view._serialize()))
@@ -431,1362 +452,271 @@ def _get_target_view(ctx, target):
     return ctx.view
 
 
-######## Transformations ########
+################################################
+################################################
+######## Transformation Input Helpers ##########
+
+def _count_leading_spaces(line):
+    return len(line) - len(line.lstrip())
+
+def _join_lines_with_indentation(lines):
+    """
+    Joins lines that are indented with the previous line.
+    """
+    joined_lines = []
+    for line in lines:
+        if not line.strip():
+            continue  # Skip empty lines
+        
+        if joined_lines:
+            if _count_leading_spaces(line) > _count_leading_spaces(joined_lines[-1]):
+                joined_lines[-1] += ' ' + line.strip()
+            else:
+                joined_lines.append(line)
+        else:
+            joined_lines.append(line)
+    
+    return joined_lines
 
 
-### Affine
+def _process_function_args(func):
+    docstring = inspect.getdoc(func)
+    
+    args_section = docstring.split("Args:")[1].split("Targets:")[0]
+    args_lines = args_section.splitlines()
+
+    args = _join_lines_with_indentation(args_lines)
+    args = [arg.strip() for arg in args if arg.strip() != ""]
+    args = [_get_arg_details(arg) for arg in args]
+    return [arg for arg in args if arg is not None]
 
 
-def _affine_input(ctx, inputs):
-    ## interpolation not supported yet
-    ## translate_px not supported yet
-    ## mask_interpolation not supported yet
-    ## cval not supported yet
-    ## cval_mask not supported yet
-    ## mode not supported yet
-    ## fit_output not supported yet
-    ## keep_ratio not supported yet
-    ## rotate_method not supported yet
+def _get_arg_type_str(arg_name_and_type):
+    arg_type = "(".join(arg_name_and_type.split("(")[1:])
+    arg_type = ")".join(arg_type.split(")")[:-1])
+    return arg_type
+    
+def _get_arg_details(arg):
+    arg_name_and_type = arg.split(":")[0].strip()
+    
+    try:
+        if "(" not in arg_name_and_type:
+            arg_name = arg_name_and_type.split(":")[0].strip()
+            if arg_name in NAME_TO_TYPE:
+                arg_type = NAME_TO_TYPE[arg_name]
+                arg_description = ''.join(arg.split(":")[1:]).strip()
+        else:
+            arg_name = arg_name_and_type.split("(")[0].strip()
+            arg_type = _get_arg_type_str(arg_name_and_type)
+            arg_description = ''.join(arg.split(":")[1:]).strip()
+        return {
+            "name": arg_name,
+            "type": arg_type,
+            "description": arg_description
+        }
+    except:
+        return None
 
-    inputs.float(
-        "affine__scale_min",
-        label="Scale min",
-        description="Minimum scale factor",
-        required=True,
-        default=0.75,
-    )
-    inputs.float(
-        "affine__scale_max",
-        label="Scale max",
-        description="Maximum scale factor",
-        required=True,
-        default=1.25,
-    )
-    inputs.float(
-        "affine__translate_percent_min",
-        label="Translate percent min",
-        description="Minimum fraction of image size by which to translate the image",
-        required=True,
-        default=0.2,
-    )
-    inputs.float(
-        "affine__translate_percent_max",
-        label="Translate percent max",
-        description="Maximum fraction of image size by which to translate the image",
-        required=True,
-        default=0.8,
-    )
-    inputs.float(
-        "affine__rotate",
-        label="Rotate",
-        description="Angle in degrees. Positive values mean clockwise rotation.",
-        required=True,
-        default=0,
-    )
-    inputs.float(
-        "affine__shear",
-        label="Shear",
-        description="Shear angle in degrees.",
-        required=True,
-        default=0,
-    )
-    inputs.float(
-        "affine__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=1.0,
-    )
+def tuple_creator(inputs, arg_type):
+    ## add in defaults...
+    def input_adder(name, **input_args):
+        obj = types.Object()
+        constructor = obj.float if arg_type == 'float' else obj.int
+        constructor(
+            "first",
+            view=types.FieldView(space=3),
+            required=True,
+        )
+        constructor(
+            "second",
+            view=types.FieldView(space=3),
+            required=True,
+        )
+        inputs.define_property(name, obj, **input_args)
+    return input_adder
 
 
-def _affine_transform(ctx):
-    scale_min = ctx.params.get("affine__scale_min", None)
-    scale_max = ctx.params.get("affine__scale_max", None)
-    translate_percent_min = ctx.params.get("affine__translate_percent_min", None)
-    translate_percent_max = ctx.params.get("affine__translate_percent_max", None)
-    rotate = ctx.params.get("affine__rotate", None)
-    shear = ctx.params.get("affine__shear", None)
-    p = ctx.params.get("affine__p", None)
-    return A.Affine(
-        scale=(scale_min, scale_max),
-        translate_percent=(translate_percent_min, translate_percent_max),
-        rotate=rotate,
-        shear=shear,
-        p=p,
-    )
-
-
-### CenterCrop
-
-
-def _center_crop_input(ctx, inputs):
-    inputs.int(
-        "center_crop__height",
-        label="Height",
-        description="The height of the crop in pixels",
-        required=True,
-    )
-    inputs.int(
-        "center_crop__width",
-        label="Width",
-        description="The width of the crop in pixels",
-        required=True,
-    )
-
-    inputs.float(
-        "center_crop__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=1.0,
-    )
-
-
-def _center_crop_transform(ctx):
-    height = ctx.params.get("center_crop__height", None)
-    width = ctx.params.get("center_crop__width", None)
-    p = ctx.params.get("center_crop__p", None)
-
-    return A.CenterCrop(height=height, width=width, p=p)
-
-
-### ChannelDropout
-
-
-def _channel_dropout_input(ctx, inputs):
-    inputs.float(
-        "channel_dropout__channel_drop_range_min",
-        label="Mininum for channel drop range",
-        description="Minimum of range from which the number of channels to drop will be sampled",
-        required=True,
-        default=1,
-    )
-    inputs.float(
-        "channel_dropout__channel_drop_range_max",
-        label="Maximum for channel drop range",
-        description="Maximum of range from which the number of channels to drop will be sampled",
-        required=True,
-        default=1,
-    )
-    inputs.float(
-        "channel_dropout__fill_value",
-        label="Fill value",
-        description="Fill value used to drop channels",
-        required=True,
-        default=0,
-    )
-    inputs.float(
-        "channel_dropout__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
-
-def _channel_dropout_transform(ctx):
-    channel_drop_range_min = ctx.params.get(
-        "channel_dropout__channel_drop_range_min", None
-    )
-    channel_drop_range_max = ctx.params.get(
-        "channel_dropout__channel_drop_range_max", None
-    )
-    fill_value = ctx.params.get("channel_dropout__fill_value", None)
-    p = ctx.params.get("channel_dropout__p", None)
-
-    return A.ChannelDropout(
-        channel_drop_range=(channel_drop_range_min, channel_drop_range_max),
-        fill_value=fill_value,
-        p=p,
-    )
-
-
-### ChannelShuffle
-
-
-def _channel_shuffle_input(ctx, inputs):
-    inputs.float(
-        "channel_shuffle__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
-
-def _channel_shuffle_transform(ctx):
-    p = ctx.params.get("channel_shuffle__p", None)
-    return A.ChannelShuffle(p=p)
+def _get_input_factory(inputs, arg_type):
+    if arg_type == 'bool':
+        return inputs.bool
+    elif arg_type == 'int':
+        return inputs.int
+    elif arg_type == 'float':
+        return inputs.float
+    elif arg_type == 'str':
+        return inputs.str
+    elif 'int, int' in arg_type:
+        return tuple_creator(inputs, 'int')
+    elif 'float, float' in arg_type:
+        return tuple_creator(inputs, 'float')
+    elif 'tuple of int' in arg_type:
+        return tuple_creator(inputs, 'int')
+    elif 'tuple of float' in arg_type:
+        return tuple_creator(inputs, 'float')
+    elif arg_type == "int, list of int":
+        ## doesn't support list of int yet
+        return inputs.int
+    elif arg_type == 'int, float':
+        return inputs.float
+    elif arg_type == '(float, float) or float':
+        ## doesn't support tuple yet
+        return inputs.float
+    elif arg_type == '(int, int) or int':
+        ## doesn't support tuple yet
+        return inputs.int
+    elif 'float,' in arg_type or 'float or' in arg_type:
+        ## doesn't support tuple yet
+        return inputs.float
+    elif 'number,' in arg_type or 'number or' in arg_type:
+        ## doesn't support tuple yet
+        return inputs.float
+    return None
 
 
 
-### CLAHE
+
+def _add_transform_inputs(inputs, transform_name):
+    transform_args = _process_function_args(getattr(A, transform_name))
+    
+    t = getattr(A, transform_name)
+    camel_case_name = _camel_to_snake(transform_name)
+
+    parameters = inspect.signature(t).parameters
+    
+    for arg in transform_args:
+        default = None
+        arg_name = arg["name"]
+        arg_type = arg["type"]
+        arg_description = arg["description"]
+
+        input_args = {
+            "label": arg_name,
+            "description": arg_description,
+            "required": True,
+        }
+
+        if arg_name in parameters:
+            default = parameters[arg_name].default
+        if default is not None and default != None and default != inspect._empty and str(type(default)) != 'tuple':
+            input_args["default"] = default
+            input_args["required"] = False
+        elif default is None:
+            input_args["required"] = False
 
 
-def _clahe_input(ctx, inputs):
-    ## [float, float] for clip_limit not supported yet
-    ## [int, int] for tile_grid_size not supported yet
-    inputs.int(
-        "clahe__clip_limit",
-        label="Clip limit",
-        description="Threshold for contrast limiting",
-        required=True,
-        default=4,
-    )
-    inputs.int(
-        "clahe__tile_grid_size",
-        label="Tile grid size",
-        description="Size of grid for histogram equalization. Input image will be divided into equally sized rectangular tiles",
-        required=True,
-        default=8,
-    )
-    inputs.float(
-        "clahe__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
+        input_factory = _get_input_factory(inputs, arg_type)
+        if input_factory is not None:
+            input_factory(
+                f"{camel_case_name}__{arg_name}",
+                **input_args
+            )
+
+################################################
+################################################
+######## Transformation Creation Helpers #######
+    
+def _extract_transform_inputs(ctx, transform_name):
+    prefix = _camel_to_snake(transform_name) + "__"
+    transform_params = {}
+    for param in ctx.params:
+        if param.startswith(prefix):
+            param_name = param[len(prefix):]
+            transform_params[param_name] = ctx.params[param]
+    return transform_params
 
 
-def _clahe_transform(ctx):
-    clip_limit = ctx.params.get("clahe__clip_limit", None)
-    tile_grid_size = ctx.params.get("clahe__tile_grid_size", None)
-    tile_grid_size = (tile_grid_size, tile_grid_size)
-    p = ctx.params.get("clahe__p", None)
-    return A.CLAHE(clip_limit=clip_limit, tile_grid_size=tile_grid_size, p=p)
+def _unwrap_dict_tuple(d):
+    if isinstance(d, dict):
+        if "first" in d and "second" in d:
+            return (d["first"], d["second"])
+    return d
 
 
-### ColorJitter
+def _unwrap_dict_tuples(args, kwargs):
+    args = [_unwrap_dict_tuple(arg) for arg in args]
+    kwargs = {key: _unwrap_dict_tuple(val) for key, val in kwargs.items()}
+    return args, kwargs
 
 
-def _color_jitter_input(ctx, inputs):
-    inputs.float(
-        "color_jitter__brightness",
-        label="Brightness",
-        description="Factor range for changing brightness.",
-        required=True,
-        default=0.2,
-    )
-    inputs.float(
-        "color_jitter__contrast",
-        label="Contrast",
-        description="Factor range for changing contrast.",
-        required=True,
-        default=0.2,
-    )
-    inputs.float(
-        "color_jitter__saturation",
-        label="Saturation",
-        description="Factor range for changing saturation.",
-        required=True,
-        default=0.2,
-    )
-    inputs.float(
-        "color_jitter__hue",
-        label="Hue",
-        description="Factor range for changing hue.",
-        required=True,
-        default=0.2,
-    )
-    inputs.float(
-        "color_jitter__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
+def _create_transform(ctx, transform_name):
+    input_dict = _extract_transform_inputs(ctx, transform_name)
+
+    t = getattr(A, transform_name)
+    params = inspect.signature(t).parameters
+
+    args = []
+    kwargs = {}
+
+    for param_name, param in params.items():
+        if param_name in input_dict:
+            if param.default != inspect._empty:
+                if input_dict[param_name] != None and input_dict[param_name] is not None:
+                    kwargs[param_name] = input_dict[param_name]
+            else:
+                args.append(input_dict[param_name])
+
+    args, kwargs = _unwrap_dict_tuples(args, kwargs)
+
+    return t(*args, **kwargs)
 
 
-def _color_jitter_transform(ctx):
-    brightness = ctx.params.get("color_jitter__brightness", None)
-    contrast = ctx.params.get("color_jitter__contrast", None)
-    saturation = ctx.params.get("color_jitter__saturation", None)
-    hue = ctx.params.get("color_jitter__hue", None)
-    p = ctx.params.get("color_jitter__p", None)
-    return A.ColorJitter(
-        brightness=brightness, contrast=contrast, saturation=saturation, hue=hue, p=p
-    )
-
-
-### Crop
-
-
-def _crop_input(ctx, inputs):
-    inputs.int(
-        "crop__x_min",
-        label="X min",
-        description="The minimum upper left x coordinate of the crop in pixels",
-        required=True,
-    )
-    inputs.int(
-        "crop__y_min",
-        label="Y min",
-        description="The minimum upper left y coordinate of the crop in pixels",
-        required=True,
-    )
-    inputs.int(
-        "crop__x_max",
-        label="X max",
-        description="The maximum lower right x coordinate of the crop in pixels",
-        required=True,
-    )
-    inputs.int(
-        "crop__y_max",
-        label="Y max",
-        description="The maximum lower right y coordinate of the crop in pixels",
-        required=True,
-    )
-
-    inputs.float(
-        "crop__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=1.0,
-    )
-
-
-def _crop_transform(ctx):
-    x_min = ctx.params.get("crop__x_min", None)
-    y_min = ctx.params.get("crop__y_min", None)
-    x_max = ctx.params.get("crop__x_max", None)
-    y_max = ctx.params.get("crop__y_max", None)
-    p = ctx.params.get("crop__p", None)
-
-    return A.Crop(x_min=x_min, y_min=y_min, x_max=x_max, y_max=y_max, p=p)
-
-
-### Downscale
-
-
-def _downscale_input(ctx, inputs):
-    ## interpolation not supported yet
-    inputs.float(
-        "downscale__scale_min",
-        label="Scale min",
-        description="Minimum scale factor",
-        required=True,
-        default=0.25,
-    )
-    inputs.float(
-        "downscale__scale_max",
-        label="Scale max",
-        description="Maximum scale factor",
-        required=True,
-        default=0.25,
-    )
-    inputs.float(
-        "downscale__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=1.0,
-    )
-
-
-def _downscale_transform(ctx):
-    scale_min = ctx.params.get("downscale__scale_min", None)
-    scale_max = ctx.params.get("downscale__scale_max", None)
-    p = ctx.params.get("downscale__p", None)
-    return A.Downscale(scale_min=scale_min, scale_max=scale_max, p=p)
-
+################################################
+################################################
+################# Transformations ##############
 
 ### Embose -- Not yet supported
-
-
-### Equalize
-
-
-def _equalize_input(ctx, inputs):
-    ## mode not supported yet
-    inputs.bool(
-        "equalize__by_channels",
-        label="By channels",
-        description="Apply equalization by channels separately",
-        required=True,
-        default=True,
-    )
-    inputs.float(
-        "equalize__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
-
-def _equalize_transform(ctx):
-    by_channels = ctx.params.get("equalize__by_channels", None)
-    p = ctx.params.get("equalize__p", None)
-    return A.Equalize(by_channels=by_channels, p=p)
-
-
 ### FancyPCA -- Not yet supported
-
-
-### Flip
-
-
-def _flip_input(ctx, inputs):
-    inputs.float(
-        "flip__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
-
-def _flip_transform(ctx):
-    p = ctx.params.get("flip__p", None)
-    return A.Flip(p=p)
-
-
-### GaussNoise
-
-
-def _gauss_noise_input(ctx, inputs):
-    inputs.float(
-        "gauss_noise__var_limit_min",
-        label="Minimum limit for Variance",
-        required=True,
-        default=10.0,
-    )
-    inputs.float(
-        "gauss_noise__var_limit_max",
-        label="Maximum limit for Variance",
-        required=True,
-        default=50.0,
-    )
-    inputs.float(
-        "gauss_noise__mean",
-        label="Mean",
-        description="Mean of the noise",
-        required=True,
-        default=0,
-    )
-    inputs.bool(
-        "gauss_noise__per_channel",
-        label="Per channel",
-        description="If True, noise will be sampled independently for each channel value",
-        required=True,
-        default=True,
-    )
-    inputs.float(
-        "gauss_noise__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
-
-def _gauss_noise_transform(ctx):
-    var_limit_min = ctx.params.get("gauss_noise__var_limit_min", None)
-    var_limit_max = ctx.params.get("gauss_noise__var_limit_max", None)
-    mean = ctx.params.get("gauss_noise__mean", None)
-    per_channel = ctx.params.get("gauss_noise__per_channel", None)
-    p = ctx.params.get("gauss_noise__p", None)
-    return A.GaussNoise(
-        var_limit=(var_limit_min, var_limit_max),
-        mean=mean,
-        per_channel=per_channel,
-        p=p,
-    )
-
-
-### HorizontalFlip
-
-
-def _horizontal_flip_input(ctx, inputs):
-    inputs.float(
-        "horizontal_flip__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
-
-def _horizontal_flip_transform(ctx):
-    p = ctx.params.get("horizontal_flip__p", None)
-    return A.HorizontalFlip(p=p)
-
-
 ### HueSaturationValue -- Not yet supported
-
-### ImageCompression
-
-
-def _image_compression_input(ctx, inputs):
-    inputs.int(
-        "image_compression__quality_lower",
-        label="Lower quality limit",
-        description="Lower bound on the image quality",
-        required=True,
-        default=99,
-    )
-    inputs.int(
-        "image_compression__quality_upper",
-        label="Upper quality limit",
-        description="Upper bound on the image quality",
-        required=True,
-        default=100,
-    )
-    inputs.float(
-        "image_compression__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
-
-def _image_compression_transform(ctx):
-    ## Compression type not supported yet
-    quality_lower = ctx.params.get("image_compression__quality_lower", None)
-    quality_upper = ctx.params.get("image_compression__quality_upper", None)
-    p = ctx.params.get("image_compression__p", None)
-    return A.ImageCompression(
-        quality_lower=quality_lower, quality_upper=quality_upper, p=p
-    )
-
-
-### InvertImg
-
-
-def _invert_img_input(ctx, inputs):
-    inputs.float(
-        "invert_img__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
-
-def _invert_img_transform(ctx):
-    p = ctx.params.get("invert_img__p", None)
-    return A.InvertImg(p=p)
-
-
 ### ISONoise -- Not yet supported
-
-
-### JpegCompression
-
-
-def _jpeg_compression_input(ctx, inputs):
-    inputs.int(
-        "jpeg_compression__quality_lower",
-        label="Lower quality limit",
-        description="Lower bound on the image quality",
-        required=True,
-        default=99,
-    )
-    inputs.int(
-        "jpeg_compression__quality_upper",
-        label="Upper quality limit",
-        description="Upper bound on the image quality",
-        required=True,
-        default=100,
-    )
-    inputs.float(
-        "jpeg_compression__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
-
-def _jpeg_compression_transform(ctx):
-    quality_lower = ctx.params.get("jpeg_compression__quality_lower", None)
-    quality_upper = ctx.params.get("jpeg_compression__quality_upper", None)
-    p = ctx.params.get("jpeg_compression__p", None)
-    return A.JpegCompression(
-        quality_lower=quality_lower, quality_upper=quality_upper, p=p
-    )
-
-
-### LongestMaxSize
-
-
-def _longest_max_size_input(ctx, inputs):
-    inputs.int(
-        "longest_max_size__max_size",
-        label="Max size",
-        description="The maximum size of the longest edge in pixels",
-        required=True,
-    )
-    inputs.float(
-        "longest_max_size__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=1.0,
-    )
-
-
-def _longest_max_size_transform(ctx):
-    max_size = ctx.params.get("longest_max_size__max_size", None)
-    p = ctx.params.get("longest_max_size__p", None)
-    return A.LongestMaxSize(max_size=max_size, p=p)
-
-
 ### Normalize -- Not yet supported
-
-
-### OpticalDistortion
-
-
-def _optical_distortion_input(ctx, inputs):
-    ## [float, float] for distort_limit not supported yet
-    ## [float, float] for shift_limit not supported yet
-    ## interpolation not supported yet
-    ## border_mode not supported yet
-    ## value not supported yet
-    ## mask_value not supported yet
-    inputs.float(
-        "optical_distortion__distort_limit",
-        label="Distort limit",
-        description="The maximum absolute change in image brightness",
-        required=True,
-        default=0.05,
-    )
-    inputs.float(
-        "optical_distortion__shift_limit",
-        label="Shift limit",
-        description="The maximum absolute change in image brightness",
-        required=True,
-        default=0.05,
-    )
-    inputs.float(
-        "optical_distortion__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
-
-def _optical_distortion_transform(ctx):
-    distort_limit = ctx.params.get("optical_distortion__distort_limit", None)
-    shift_limit = ctx.params.get("optical_distortion__shift_limit", None)
-    p = ctx.params.get("optical_distortion__p", None)
-    return A.OpticalDistortion(
-        distort_limit=distort_limit, shift_limit=shift_limit, p=p
-    )
-
-
-### PadIfNeeded
-
-
-def _pad_if_needed_input(ctx, inputs):
-    ## position not supported yet
-    ## border_mode not supported yet
-    ## value not supported yet
-    ## mask_value not supported yet
-    inputs.int(
-        "pad_if_needed__min_height",
-        label="Minimum height",
-        description="Minimum height of the output",
-        required=True,
-    )
-    inputs.int(
-        "pad_if_needed__min_width",
-        label="Minimum width",
-        description="Minimum width of the output",
-        required=True,
-    )
-    inputs.float(
-        "pad_if_needed__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=1.0,
-    )
-
-
-def _pad_if_needed_transform(ctx):
-    min_height = ctx.params.get("pad_if_needed__min_height", None)
-    min_width = ctx.params.get("pad_if_needed__min_width", None)
-    p = ctx.params.get("pad_if_needed__p", None)
-    return A.PadIfNeeded(min_height=min_height, min_width=min_width, p=p)
-
-
-### Perspective
-
-
-def _perspective_input(ctx, inputs):
-    inputs.float(
-        "perspective__scale",
-        label="Scale",
-        description=(
-            "Standard deviation of the normal distributions used to sample the ",
-            " random distances of the subimage's corners from the full image's corners.",
-        ),
-        required=True,
-        default=0.1,
-    )
-    inputs.bool(
-        "perspective__keep_size",
-        label="Keep size",
-        description="Whether to resize image’s back to their original size after applying the perspective transform",
-        required=True,
-        default=True,
-    )
-    inputs.float(
-        "perspective__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
-
-def _perspective_transform(ctx):
-    scale = ctx.params.get("perspective__scale", None)
-    keep_size = ctx.params.get("perspective__keep_size", None)
-    p = ctx.params.get("perspective__p", None)
-    return A.Perspective(scale=scale, keep_size=keep_size, p=p)
-
-
-def _pixel_dropout_input(ctx, inputs):
-    inputs.float(
-        "pixel_dropout__dropout_prob",
-        label="Pixel drop probability",
-        required=True,
-        default=0.01,
-    )
-    inputs.bool(
-        "pixel_dropout__per_channel",
-        label="Per channel",
-        description=(
-            "if set to True drop mask will be sampled fo each channel,",
-            "otherwise the same mask will be sampled for all channels.",
-        ),
-        required=True,
-        default=False,
-    )
-    inputs.float(
-        "pixel_dropout__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
-
-def _pixel_dropout_transform(ctx):
-    dropout_prob = ctx.params.get("pixel_dropout__dropout_prob", None)
-    per_channel = ctx.params.get("pixel_dropout__per_channel", None)
-    p = ctx.params.get("pixel_dropout__p", None)
-    return A.PixelDropout(dropout_prob=dropout_prob, per_channel=per_channel, p=p)
-
-
 ### Posterize -- Not yet supported
-
-
-### RandomBrightness
-
-
-def _random_brightness_input(ctx, inputs):
-    ## [float, float] for limit not supported yet
-    inputs.float(
-        "random_brightness__limit",
-        label="Brightness limit",
-        description="Factor range for changing brightness.",
-        required=True,
-        default=0.2,
-    )
-    inputs.float(
-        "random_brightness__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
-
-def _random_brightness_transform(ctx):
-    limit = ctx.params.get("random_brightness__limit", None)
-    p = ctx.params.get("random_brightness__p", None)
-    return A.RandomBrightness(limit=limit, p=p)
-
-
-### RandomBrightnessContrast
-
-
-def _random_brightness_contrast_input(ctx, inputs):
-    ## [float, float] for brightness_limit not supported yet
-    ## [float, float] for contrast_limit not supported yet
-    inputs.float(
-        "random_brightness_contrast__brightness_limit",
-        label="Brightness limit",
-        description="Factor range for changing brightness.",
-        required=True,
-        default=0.2,
-    )
-    inputs.float(
-        "random_brightness_contrast__contrast_limit",
-        label="Contrast limit",
-        description="Factor range for changing contrast.",
-        required=True,
-        default=0.2,
-    )
-    inputs.bool(
-        "random_brightness_contrast__brightness_by_max",
-        label="Brightness by max",
-        description="If True adjust contrast by image dtype maximum.",
-        required=True,
-        default=True,
-    )
-    inputs.float(
-        "random_brightness_contrast__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
-
-def _random_brightness_contrast_transform(ctx):
-    brightness_limit = ctx.params.get(
-        "random_brightness_contrast__brightness_limit", None
-    )
-    contrast_limit = ctx.params.get("random_brightness_contrast__contrast_limit", None)
-    brightness_by_max = ctx.params.get(
-        "random_brightness_contrast__brightness_by_max", None
-    )
-    p = ctx.params.get("random_brightness_contrast__p", None)
-    return A.RandomContrast(
-        brightness_limit=brightness_limit,
-        contrast_limit=contrast_limit,
-        brightness_by_max=brightness_by_max,
-        p=p,
-    )
-
-
-### RandomContrast
-
-
-def _random_contrast_input(ctx, inputs):
-    ## [float, float] for limit not supported yet
-    inputs.float(
-        "random_contrast__limit",
-        label="Contrast limit",
-        description="Factor range for changing contrast.",
-        required=True,
-        default=0.2,
-    )
-    inputs.float(
-        "random_contrast__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
-
-def _random_contrast_transform(ctx):
-    limit = ctx.params.get("random_contrast__limit", None)
-    p = ctx.params.get("random_contrast__p", None)
-    return A.RandomContrast(limit=limit, p=p)
-
-
-### RandomCrop
-
-
-def _random_crop_input(ctx, inputs):
-    inputs.int(
-        "random_crop__height",
-        label="Height",
-        description="The height of the crop in pixels",
-        required=True,
-    )
-    inputs.int(
-        "random_crop__width",
-        label="Width",
-        description="The width of the crop in pixels",
-        required=True,
-    )
-    inputs.float(
-        "random_crop__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=1.0,
-    )
-
-
-def _random_crop_transform(ctx):
-    height = ctx.params.get("random_crop__height", None)
-    width = ctx.params.get("random_crop__width", None)
-    p = ctx.params.get("random_crop__p", None)
-    return A.RandomCrop(height=height, width=width, p=p)
-
-
-### RandomFog
-
-
-def _random_fog_input(ctx, inputs):
-    inputs.float(
-        "random_fog__fog_coef_lower",
-        label="Lower fog coefficient",
-        description="Lower bound on the fog intensity coefficient. Should be in the range [0, fog_coef_upper]",
-        required=True,
-        default=0.3,
-    )
-    inputs.float(
-        "random_fog__fog_coef_upper",
-        label="Upper fog coefficient",
-        description="Upper bound on the fog intensity coefficient. Should be in the range [fog_coef_lower, 1.0]",
-        required=True,
-        default=1,
-    )
-    inputs.float(
-        "random_fog__alpha_coef",
-        label="Alpha coefficient",
-        description="Transparency of the fog circles. Must be in the range (0, 1]",
-        required=True,
-        default=0.08,
-    )
-    inputs.float(
-        "random_fog__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
-
-def _random_fog_transform(ctx):
-    fog_coef_lower = ctx.params.get("random_fog__fog_coef_lower", None)
-    fog_coef_upper = ctx.params.get("random_fog__fog_coef_upper", None)
-    alpha_coef = ctx.params.get("random_fog__alpha_coef", None)
-    p = ctx.params.get("random_fog__p", None)
-    return A.RandomFog(fog_coef_lower=fog_coef_lower, fog_coef_upper=fog_coef_upper, alpha_coef=alpha_coef, p=p)
-
-
-### RandomGamma
-
-
-def _random_gamma_input(ctx, inputs):
-    inputs.float(
-        "random_gamma__gamma_limit_min",
-        label="Minimum limit for gamma",
-        required=True,
-        default=80.0,
-    )
-    inputs.float(
-        "random_gamma__gamma_limit_max",
-        label="Maximum limit for gamma",
-        required=True,
-        default=120.0,
-    )
-    inputs.float(
-        "random_gamma__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
-
-def _random_gamma_transform(ctx):
-    gamma_limit_min = ctx.params.get("random_gamma__gamma_limit_min", None)
-    gamma_limit_max = ctx.params.get("random_gamma__gamma_limit_max", None)
-    p = ctx.params.get("random_gamma__p", None)
-    return A.RandomGamma(gamma_limit=(gamma_limit_min, gamma_limit_max), p=p)
-
-
+### RandomCropNearBBox  | Target bbox --> not yet supported
 ### RandomGravel -- Not yet supported
 
 
 ### RandomGridShuffle
 
 
-def _random_grid_shuffle_input(ctx, inputs):
-    ## [int, int] for grid not supported yet
-    inputs.int(
-        "random_grid_shuffle__grid",
-        label="Grid",
-        description="Grid size for shuffling.",
-        required=True,
-        default=3,
-    )
-    inputs.int(
-        "random_grid_shuffle__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
+# def _random_grid_shuffle_input(ctx, inputs):
+#     ## [int, int] for grid not supported yet
+#     inputs.int(
+#         "random_grid_shuffle__grid",
+#         label="Grid",
+#         description="Grid size for shuffling.",
+#         required=True,
+#         default=3,
+#     )
+#     inputs.int(
+#         "random_grid_shuffle__p",
+#         label="Probability",
+#         description="The probability of applying the transform",
+#         required=True,
+#         default=0.5,
+#     )
 
 
-def _random_grid_shuffle_transform(ctx):
-    grid = ctx.params.get("random_grid_shuffle__grid", None)
-    p = ctx.params.get("random_grid_shuffle__p", None)
-    return A.RandomGridShuffle(grid=grid, p=p)
+# def _random_grid_shuffle_transform(ctx):
+#     grid = ctx.params.get("random_grid_shuffle__grid", None)
+#     p = ctx.params.get("random_grid_shuffle__p", None)
+#     return A.RandomGridShuffle(grid=grid, p=p)
 
 
 ### RandomRain
 
-
+### DON'T REMOVE
 def _random_rain_input(ctx, inputs):
+    _add_transform_inputs(inputs, "RandomRain")
     ## drop color not supported yet
     ## rain type not supported yet
-    inputs.float(
-        "random_rain__slant_lower",
-        label="Lower slant limit",
-        description="Lower bound on the slant of the rain drops. Should be in the range [-20, slant_upper]",
-        required=True,
-        default=-10,
-    )
-    inputs.float(
-        "random_rain__slant_upper",
-        label="Upper slant limit",
-        description="Upper bound on the slant of the rain drops. Should be in the range [slant_lower, 20]",
-        required=True,
-        default=10,
-    )
-    inputs.float(
-        "random_rain__drop_length",
-        label="Drop length",
-        description="Length of the rain drops in pixels",
-        required=True,
-        default=20,
-    )
-    inputs.float(
-        "random_rain__drop_width",
-        label="Drop width",
-        description="Width of the rain drops in pixels",
-        required=True,
-        default=1,
-    )
-    inputs.float(
-        "random_rain__blur_value",
-        label="Blur value",
-        description="Blurring value to simulate rain drop depth",
-        required=True,
-        default=7,
-    )
-    inputs.float(
-        "random_rain__brightness_coefficient",
-        label="Brightness coefficient",
-        description="Brightness coefficient. Should be in the range (0, 1)",
-        required=True,
-        default=0.7,
-    )
-    inputs.float(
-        "random_rain__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
 
 def _random_rain_transform(ctx):
-    slant_lower = ctx.params.get("random_rain__slant_lower", None)
-    slant_upper = ctx.params.get("random_rain__slant_upper", None)
-    drop_length = ctx.params.get("random_rain__drop_length", None)
-    drop_width = ctx.params.get("random_rain__drop_width", None)
-    blur_value = ctx.params.get("random_rain__blur_value", None)
-    brightness_coefficient = ctx.params.get(
-        "random_rain__brightness_coefficient", None
-    )
-    p = ctx.params.get("random_rain__p", None)
-    return A.RandomRain(
-        slant_lower=slant_lower,
-        slant_upper=slant_upper,
-        drop_length=drop_length,
-        drop_width=drop_width,
-        blur_value=blur_value,
-        brightness_coefficient=brightness_coefficient,
-        p=p,
-    )
-
-
-### RandomResizedCrop
-
-
-def _random_resized_crop_input(ctx, inputs):
-    inputs.int(
-        "random_resized_crop__height",
-        label="Height",
-        description="The height after crop and resize.",
-        required=True,
-        default=224,
-    )
-    inputs.int(
-        "random_resized_crop__width",
-        label="Width",
-        description="The width after crop and resize.",
-        required=True,
-        default=224,
-    )
-
-    inputs.float(
-        "random_resized_crop__scale_min",
-        label="Scale min",
-        description="Minimum scale of the crop.",
-        required=True,
-        default=0.08,
-    )
-    inputs.float(
-        "random_resized_crop__scale_max",
-        label="Scale max",
-        description="Maximum scale of the crop.",
-        required=True,
-        default=1.0,
-    )
-
-    inputs.float(
-        "random_resized_crop__ratio_min",
-        label="Ratio min",
-        description="Minimum aspect ratio of the crop.",
-        required=True,
-        default=0.75,
-    )
-    inputs.float(
-        "random_resized_crop__ratio_max",
-        label="Ratio max",
-        description="Maximum aspect ratio of the crop.",
-        required=True,
-        default=1.33,
-    )
-
-
-def _random_resized_crop_transform(ctx):
-    height = ctx.params.get("random_resized_crop__height", None)
-    width = ctx.params.get("random_resized_crop__width", None)
-    scale_min = ctx.params.get("random_resized_crop__scale_min", None)
-    scale_max = ctx.params.get("random_resized_crop__scale_max", None)
-    ratio_min = ctx.params.get("random_resized_crop__ratio_min", None)
-    ratio_max = ctx.params.get("random_resized_crop__ratio_max", None)
-
-    return A.RandomResizedCrop(
-        height=height,
-        width=width,
-        scale=(scale_min, scale_max),
-        ratio=(ratio_min, ratio_max),
-        p=1.0,
-    )
-
-
-### RandomRotate90
-
-
-def _random_rotate90_input(ctx, inputs):
-    inputs.float(
-        "random_rotate90__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
-
-def _random_rotate90_transform(ctx):
-    p = ctx.params.get("random_rotate90__p", None)
-    return A.RandomRotate90(p=p)
-
-
-### RandomScale
-
-
-def _random_scale_input(ctx, inputs):
-    inputs.float(
-        "random_scale__scale_limit",
-        label="Scale limit",
-        description="Scaling factor interval.",
-        required=True,
-        default=0.2,
-    )
-    inputs.bool(
-        "random_scale__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
-
-def _random_scale_transform(ctx):
-    scale_limit = ctx.params.get("random_scale__scale_limit", None)
-    interpolation = cv2.INTER_NEAREST
-    p = ctx.params.get("random_scale__p", None)
-    return A.RandomScale(scale_limit=scale_limit, interpolation=interpolation, p=p)
+    return _create_transform(ctx, "RandomRain")
 
 
 ### RandomShadow -- Not yet supported
-
-
-### RandomSnow
-
-
-def _random_snow_input(ctx, inputs):
-    inputs.float(
-        "random_snow__snow_point_lower",
-        label="Lower snow point",
-        description="Lower bound on the snow point. Should be in the range [0, snow_point_upper]",
-        required=True,
-        default=0.1,
-    )
-    inputs.float(
-        "random_snow__snow_point_upper",
-        label="Upper snow point",
-        description="Upper bound on the snow point. Should be in the range [snow_point_lower, 1.0]",
-        required=True,
-        default=0.3,
-    )
-    inputs.float(
-        "random_snow__brightness_coeff",
-        label="Brightness coefficient",
-        description="Brightness coefficient. Should be in the range (0, 1)",
-        required=True,
-        default=2.5,
-    )
-    inputs.float(
-        "random_snow__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
-
-def _random_snow_transform(ctx):
-    snow_point_lower = ctx.params.get("random_snow__snow_point_lower", None)
-    snow_point_upper = ctx.params.get("random_snow__snow_point_upper", None)
-    brightness_coeff = ctx.params.get("random_snow__brightness_coeff", None)
-    p = ctx.params.get("random_snow__p", None)
-    return A.RandomSnow(
-        snow_point_lower=snow_point_lower,
-        snow_point_upper=snow_point_upper,
-        brightness_coeff=brightness_coeff,
-        p=p,
-    )
-
-
 ### RandomSunFlare -- Not yet supported
-
-
-### RandomToneCurve
-
-
-def _random_tone_curve_input(ctx, inputs):
-    inputs.float(
-        "random_tone_curve__scale",
-        label="Scale",
-        description=(
-            "standard deviation of the normal distribution. Used to sample "
-            "random distances to move two control points that modify the image's"
-            " curve. Values should be in range [0, 1]. "
-        ),
-        required=True,
-        default=0.1,
-    )
-    inputs.float(
-        "random_tone_curve__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
-
-def _random_tone_curve_transform(ctx):
-    scale = ctx.params.get("random_tone_curve__scale", None)
-    p = ctx.params.get("random_tone_curve__p", None)
-    return A.RandomToneCurve(scale=scale, p=p)
-
-
-### Resize
-
-
-def _resize_input(ctx, inputs):
-    inputs.int(
-        "resize__height",
-        label="Height",
-        description="The height after crop and resize.",
-        required=True,
-        default=224,
-    )
-    inputs.int(
-        "resize__width",
-        label="Width",
-        description="The width after crop and resize.",
-        required=True,
-        default=224,
-    )
-    inputs.float(
-        "resize__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=1.0,
-    )
-
-
-def _resize_transform(ctx):
-    height = ctx.params.get("resize__height", None)
-    width = ctx.params.get("resize__width", None)
-    p = ctx.params.get("resize__p", None)
-    return A.Resize(height=height, width=width, p=p)
-
-
-### RGBShift
-
-
-def _rgb_shift_input(ctx, inputs):
-    ## [int, int] for r_shift_limit not supported yet
-    ## [int, int] for g_shift_limit not supported yet
-    ## [int, int] for b_shift_limit not supported yet
-    inputs.int(
-        "rgb_shift__r_shift_limit",
-        label="R shift limit",
-        description="Factor range for changing red color channel.",
-        required=True,
-        default=20,
-    )
-    inputs.int(
-        "rgb_shift__g_shift_limit",
-        label="G shift limit",
-        description="Factor range for changing green color channel.",
-        required=True,
-        default=20,
-    )
-    inputs.int(
-        "rgb_shift__b_shift_limit",
-        label="B shift limit",
-        description="Factor range for changing blue color channel.",
-        required=True,
-        default=20,
-    )
-    inputs.float(
-        "rgb_shift__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
-
-def _rgb_shift_transform(ctx):
-    r_shift_limit = ctx.params.get("rgb_shift__r_shift_limit", None)
-    g_shift_limit = ctx.params.get("rgb_shift__g_shift_limit", None)
-    b_shift_limit = ctx.params.get("rgb_shift__b_shift_limit", None)
-    p = ctx.params.get("rgb_shift__p", None)
-    return A.RGBShift(
-        r_shift_limit=r_shift_limit, g_shift_limit=g_shift_limit, b_shift_limit=b_shift_limit, p=p
-    )
-
-
 ### RingingOvershoot -- Not yet supported
+### Rotate -- Not yet supported
 ### Sharpen -- Not yet supported
 ### ShiftScaleRotate -- Not yet supported
 ### Solarize -- Not yet supported
@@ -1794,116 +724,20 @@ def _rgb_shift_transform(ctx):
 ### Superpixels -- Not yet supported
 
 
-### Transpose
 
+####### Unifying functions #######
 
-def _transpose_input(ctx, inputs):
-    inputs.float(
-        "transpose__p",
-        label="Probability",
-        description="The probability of applying the transform",
-        required=True,
-        default=0.5,
-    )
-
-
-def _transpose_transform(ctx):
-    p = ctx.params.get("transpose__p", None)
-    return A.Transpose(p=p)
-
-
-
-### TODO: CropAndPad, PadIfNeeded, PiecewiseAffine, ...
-
-
-transform_name_to_input_parser = {
-    "affine": _affine_input,
-    "center_crop": _center_crop_input,
-    "channel_dropout": _channel_dropout_input,
-    "channel_shuffle": _channel_shuffle_input,
-    "clahe": _clahe_input,
-    "color_jitter": _color_jitter_input,
-    "crop": _crop_input,
-    "downscale": _downscale_input,
-    "equalize": _equalize_input,
-    "flip": _flip_input,
-    "gauss_noise": _gauss_noise_input,
-    "horizontal_flip": _horizontal_flip_input,
-    "image_compression": _image_compression_input,
-    "invert_img": _invert_img_input,
-    "jpeg_compression": _jpeg_compression_input,
-    "longest_max_size": _longest_max_size_input,
-    "optical_distortion": _optical_distortion_input,
-    "pad_if_needed": _pad_if_needed_input,
-    "perspective": _perspective_input,
-    "pixel_dropout": _pixel_dropout_input,
-    "random_brightness": _random_brightness_input,
-    "random_brightness_contrast": _random_brightness_contrast_input,
-    "random_contrast": _random_contrast_input,
-    "random_crop": _random_crop_input,
-    "random_fog": _random_fog_input,
-    "random_gamma": _random_gamma_input,
-    "random_grid_shuffle": _random_grid_shuffle_input,
-    "random_rain": _random_rain_input,
-    "random_resized_crop": _random_resized_crop_input,
-    "random_rotate90": _random_rotate90_input,
-    "random_scale": _random_scale_input,
-    "random_snow": _random_snow_input,
-    "random_tone_curve": _random_tone_curve_input,
-    "resize": _resize_input,
-    "rgb_shift": _rgb_shift_input,
-    "transpose": _transpose_input,
-}
-
-
-transform_name_to_transform = {
-    "affine": _affine_transform,
-    "center_crop": _center_crop_transform,
-    "channel_dropout": _channel_dropout_transform,
-    "channel_shuffle": _channel_shuffle_transform,
-    "clahe": _clahe_transform,
-    "color_jitter": _color_jitter_transform,
-    "crop": _crop_transform,
-    "downscale": _downscale_transform,
-    "equalize": _equalize_transform,
-    "flip": _flip_transform,
-    "gauss_noise": _gauss_noise_transform,
-    "horizontal_flip": _horizontal_flip_transform,
-    "image_compression": _image_compression_transform,
-    "invert_img": _invert_img_transform,
-    "jpeg_compression": _jpeg_compression_transform,
-    "longest_max_size": _longest_max_size_transform,
-    "optical_distortion": _optical_distortion_transform,
-    "pad_if_needed": _pad_if_needed_transform,
-    "perspective": _perspective_transform,
-    "pixel_dropout": _pixel_dropout_transform,
-    "random_brightness": _random_brightness_transform,
-    "random_brightness_contrast": _random_brightness_contrast_transform,
-    "random_contrast": _random_contrast_transform,
-    "random_crop": _random_crop_transform,
-    "random_fog": _random_fog_transform,
-    "random_gamma": _random_gamma_transform,
-    "random_grid_shuffle": _random_grid_shuffle_transform,
-    "random_rain": _random_rain_transform,
-    "random_resized_crop": _random_resized_crop_transform,
-    "random_rotate90": _random_rotate90_transform,
-    "random_scale": _random_scale_transform,
-    "random_snow": _random_snow_transform,
-    "random_tone_curve": _random_tone_curve_transform,
-    "resize": _resize_transform,
-    "rgb_shift": _rgb_shift_transform,
-    "transpose": _transpose_transform,
-}
-
-
+### The camel case conversion should superseed this
 transform_name_to_label = {
     "affine": "Affine",
+    "bbox_safe_random_crop": "BBoxSafeRandomCrop",
     "center_crop": "CenterCrop",
     "channel_dropout": "ChannelDropout",
     "channel_shuffle": "ChannelShuffle",
     "clahe": "CLAHE",
     "color_jitter": "ColorJitter",
     "crop": "Crop",
+    "crop_and_pad": "CropAndPad",
     "downscale": "Downscale",
     "equalize": "Equalize",
     "flip": "Flip",
@@ -1913,12 +747,16 @@ transform_name_to_label = {
     "invert_img": "InvertImg",
     "jpeg_compression": "JpegCompression",
     "longest_max_size": "LongestMaxSize",
+    "optical_distortion": "OpticalDistortion",
+    "pad_if_needed": "PadIfNeeded",
     "perspective": "Perspective",
     "pixel_dropout": "PixelDropout",
     "random_brightness": "RandomBrightness",
     "random_brightness_contrast": "RandomBrightnessContrast",
     "random_contrast": "RandomContrast",
     "random_crop": "RandomCrop",
+    "random_crop_from_borders": "RandomCropFromBorders",
+    # "random_crop_near_bbox": "RandomCropNearBBox",
     "random_fog": "RandomFog",
     "random_gamma": "RandomGamma",
     "random_grid_shuffle": "RandomGridShuffle",
@@ -1926,11 +764,39 @@ transform_name_to_label = {
     "random_resized_crop": "RandomResizedCrop",
     "random_rotate90": "RandomRotate90",
     "random_scale": "RandomScale",
+    "random_sized_bbox_safe_crop": "RandomSizedBBoxSafeCrop",
     "random_snow": "RandomSnow",
     "random_tone_curve": "RandomToneCurve",
     "resize": "Resize",
     "rgb_shift": "RGBShift",
+    "transpose": "Transpose",
+    "vertical_flip": "VerticalFlip",
 }
+
+
+def get_input_parser(transform_name):
+    function_name = f"_{transform_name}_input"
+    if function_name in globals():
+        # Defined explicitly above
+        input_parser_function = globals()[function_name]
+    else:
+        label = transform_name_to_label[transform_name]
+        # Define the function dynamically using a lambda function
+        input_parser_function = lambda ctx, inputs: _add_transform_inputs(inputs, label)
+    return input_parser_function
+
+
+def get_transform_func(transform_name):
+    function_name = f"_{transform_name}_transform"
+    if function_name in globals():
+        # Defined explicitly above
+        transform_function = globals()[function_name]
+    else:
+        label = transform_name_to_label[transform_name]
+        # Define the function dynamically using a lambda function
+        transform_function = lambda ctx: _create_transform(ctx, label)
+    return transform_function
+
 
 
 def _transforms_input(ctx, inputs):
@@ -1949,6 +815,10 @@ def _transforms_input(ctx, inputs):
         view=types.AutocompleteView(),
         required=True,
     )
+
+    # x = ctx.params.get("tmp", None)
+    # if x is not None:
+    #     inputs.str("mamama", label=str(x["name"]))
 
 
 def _cleanup_last_transform(dataset):
@@ -2045,9 +915,11 @@ class AugmentWithAlbumentations(foo.Operator):
 
         transform_name = ctx.params.get("transforms", None)
 
-        if transform_name is not None and transform_name in transform_name_to_input_parser:
-            transform_input_parser = transform_name_to_input_parser[transform_name]
+        try:
+            transform_input_parser = get_input_parser(transform_name)
             transform_input_parser(ctx, inputs)
+        except:
+            pass
 
         inputs.int(
             "num_augs",
@@ -2075,7 +947,8 @@ class AugmentWithAlbumentations(foo.Operator):
 
     def execute(self, ctx):
         transform_name = ctx.params.get("transforms", None)
-        transform_func = transform_name_to_transform[transform_name]
+        
+        transform_func = get_transform_func(transform_name)
         transform = transform_func(ctx)
 
         transform = A.Compose(
@@ -2114,8 +987,7 @@ class GetLastAlbumentationsRunInfo(foo.Operator):
         return foo.OperatorConfig(
             name="get_last_albumentations_run_info",
             label="Get info about the last Albumentations run",
-            light_icon="/assets/icon.svg",
-            dark_icon="/assets/icon.svg",
+            icon="/assets/icon.svg",
             dynamic=True,
         )
 
@@ -2176,8 +1048,7 @@ class ViewLastAlbumentationsRun(foo.Operator):
         return foo.OperatorConfig(
             name="view_last_albumentations_run",
             label="View last Albumentations run",
-            light_icon="/assets/icon.svg",
-            dark_icon="/assets/icon.svg",
+            icon="/assets/icon.svg",
             dynamic=True,
         )
 
@@ -2210,8 +1081,7 @@ class SaveLastAlbumentationsTransform(foo.Operator):
         return foo.OperatorConfig(
             name="save_albumentations_transform",
             label="Save transform",
-            light_icon="/assets/icon.svg",
-            dark_icon="/assets/icon.svg",
+            icon="/assets/icon.svg",
             dynamic=True,
         )
 
@@ -2272,8 +1142,7 @@ class SaveLastAlbumentationsAugmentations(foo.Operator):
         return foo.OperatorConfig(
             name="save_albumentations_augmentations",
             label="Save augmentations",
-            light_icon="/assets/icon.svg",
-            dark_icon="/assets/icon.svg",
+            icon="/assets/icon.svg",
             dynamic=True,
         )
 
@@ -2297,12 +1166,10 @@ def register(plugin):
 
 
 ### To Do:
-## Add a message for each transform
 ## Delete transform
 ## See saved transforms
 ## compose transforms
 ## Export transform
-## descriptive descriptions
 ## Rerun last transform
 ## Add in more base transforms
 
