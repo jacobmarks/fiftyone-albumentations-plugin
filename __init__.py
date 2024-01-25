@@ -142,52 +142,6 @@ SUPPORTED_TRANSFORMS = (
 )
 
 
-# SUPPORTED_TRANSFORMS = (
-#     "GridDistortion",
-#     "ChannelDropout",
-#     "ChannelShuffle",
-#     "CLAHE",
-#     "ColorJitter",
-#     "Defocus",
-#     "Downscale",
-#     "Equalize",
-#     "GaussNoise",
-#     "ImageCompression",
-#     "InvertImg",
-#     "ISONoise",
-#     "JpegCompression",
-#     "PixelDropout",
-#     "RandomBrightness",
-#     "RandomBrightnessContrast",
-#     "RandomContrast",
-#     "RandomFog",
-#     "RandomGamma",
-#     # "RandomGridShuffle",
-#     "RandomRain",
-#     "RandomRotate90",
-#     "RandomSnow",
-#     "RandomToneCurve",
-#     "RGBShift",
-# )
-
-### Embose -- Not yet supported
-### FancyPCA -- Not yet supported
-### HueSaturationValue -- Not yet supported
-### Normalize -- Not yet supported
-### Posterize -- Not yet supported
-### RandomCropNearBBox  | Target bbox --> not yet supported
-### RandomGravel -- Not yet supported
-### RandomShadow -- Not yet supported
-### RandomSunFlare -- Not yet supported
-### RingingOvershoot -- Not yet supported
-### Rotate -- Not yet supported
-### Sharpen -- Not yet supported
-### ShiftScaleRotate -- Not yet supported
-### Solarize -- Not yet supported
-### Spatter -- Not yet supported
-### Superpixels -- Not yet supported
-
-
 ################################################
 
 
