@@ -19,6 +19,7 @@ from fiftyone.operators import types
 from fiftyone.core.utils import add_sys_path
 
 LAST_ALBUMENTATIONS_RUN_KEY = "_last_albumentations_run"
+ALBUMENTATIONS_RUN_INDICATOR = "albumentations_transform_"
 
 ## for camelCase to snake_case conversion
 pattern = re.compile(r'(?<!^)(?=[A-Z])')
@@ -719,6 +720,12 @@ def get_transform_func(transform_name):
     return transform_function
 
 
+def _get_albumentations_run_names(ctx):
+    run_keys = ctx.dataset.list_runs()
+    run_keys = [run_key for run_key in run_keys if run_key.startswith(ALBUMENTATIONS_RUN_INDICATOR)]
+    run_names = [ctx.dataset.get_run_info(run_key).config.name for run_key in run_keys]
+    return run_names
+
 
 def _transforms_from_primitive_input(ctx, inputs, num=0):
     transform_choices = SUPPORTED_TRANSFORMS
@@ -739,9 +746,18 @@ def _transforms_from_primitive_input(ctx, inputs, num=0):
 
 def _get_saved_transform_run_names(ctx):
     run_keys = ctx.dataset.list_runs()
-    run_keys = [run_key for run_key in run_keys if run_key.startswith("albumentations_transform_")]
+    run_keys = [run_key for run_key in run_keys if run_key.startswith(ALBUMENTATIONS_RUN_INDICATOR)]
     run_names = [ctx.dataset.get_run_info(run_key).config.name for run_key in run_keys]
     return run_names
+
+
+def _get_run_key_from_name(ctx, run_name):
+    run_keys = ctx.dataset.list_runs()
+    run_keys = [run_key for run_key in run_keys if run_key.startswith(ALBUMENTATIONS_RUN_INDICATOR)]
+    for run_key in run_keys:
+        if ctx.dataset.get_run_info(run_key).config.name == run_name:
+            break
+    return run_key
 
 
 def _transforms_from_saved_input(ctx, inputs, num=0):
@@ -999,6 +1015,18 @@ class GetLastAlbumentationsRunInfo(foo.Operator):
 
     def resolve_input(self, ctx):
         inputs = types.Object()
+        
+        if LAST_ALBUMENTATIONS_RUN_KEY not in ctx.dataset.list_runs():
+            inputs.view(
+                "warning", 
+                types.Warning(
+                    label="No Albumentations runs yet!", 
+                    description="To create a transform, use the `Augment with Albumentations` operator"
+                    )
+            )
+            inputs.str("run_key", required=True, view = types.HiddenView())
+            return types.Property(inputs, view = types.View())
+        
         view = types.View(label="Get last Albumentations run info")
         return types.Property(inputs, view=view)
 
@@ -1035,10 +1063,6 @@ class GetLastAlbumentationsRunInfo(foo.Operator):
 
     def resolve_output(self, ctx):
         outputs = types.Object()
-        if LAST_ALBUMENTATIONS_RUN_KEY not in ctx.dataset.list_runs():
-            outputs.str("message", label="No Albumentations runs yet!")
-            view = types.View()
-            return types.Property(outputs, view=view)
         
         outputs.str("timestamp", label="Creation time")
         outputs.str("version", label="FiftyOne version")
@@ -1160,8 +1184,6 @@ class SaveLastAlbumentationsAugmentations(foo.Operator):
         _save_augmentations(ctx)
         ctx.trigger("reload_dataset")
 
-
-
 class GetAlbumentationsRunInfo(foo.Operator):
     @property
     def config(self):
@@ -1174,21 +1196,20 @@ class GetAlbumentationsRunInfo(foo.Operator):
 
     def resolve_input(self, ctx):
         inputs = types.Object()
-        run_keys = ctx.dataset.list_runs()
-        run_keys = [run_key for run_key in run_keys if run_key.startswith("albumentations_transform_")]
-        rum_names = [ctx.dataset.get_run_info(run_key).config.name for run_key in run_keys]
+        run_names = _get_albumentations_run_names(ctx)
 
-        if len(run_keys) == 0:
+        if len(run_names) == 0:
             inputs.view(
                 "no_runs_error", 
                 types.Error(
                     label="No saved Albumentations runs", 
-                    description="There are no saved Albumentations runs")
+                    description="To create a transform, use the `Augment with Albumentations` operator")
             )
+            inputs.str("run_key", required=True, view = types.HiddenView())
             return types.Property(inputs, view=types.View())
         
         run_choices = types.RadioGroup()
-        for run_name in rum_names:
+        for run_name in run_names:
             run_choices.add_choice(run_name, label=run_name)
 
         inputs.enum(
@@ -1205,12 +1226,7 @@ class GetAlbumentationsRunInfo(foo.Operator):
 
     def execute(self, ctx):
         run_name = ctx.params.get("run_name", None)
-        run_keys = ctx.dataset.list_runs()
-        run_keys = [run_key for run_key in run_keys if run_key.startswith("albumentations_transform_")]
-        for run_key in run_keys:
-            if ctx.dataset.get_run_info(run_key).config.name == run_name:
-                break
-
+        run_key = _get_run_key_from_name(ctx, run_name)
         info = ctx.dataset.get_run_info(run_key)
 
         timestamp = info.timestamp.strftime("%Y-%M-%d %H:%M:%S")
