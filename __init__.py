@@ -1,18 +1,15 @@
 """Albumentations image augmentation plugin.
 """
 
-# import hashlib
-# import random
+from bson import json_util
+import inspect
+import os
+
 import albumentations as A
 import cv2
-from PIL import Image
-import numpy as np
 import json
-from bson import json_util
-import os
-import inspect
-
-# import re
+import numpy as np
+from PIL import Image
 
 import fiftyone as fo
 import fiftyone.operators as foo
