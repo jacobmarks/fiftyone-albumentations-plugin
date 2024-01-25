@@ -11,3 +11,4 @@ operators:
   - save_albumentations_transform
   - save_albumentations_augmentations
   - get_albumentations_run_info
+  - delete_albumentations_run
