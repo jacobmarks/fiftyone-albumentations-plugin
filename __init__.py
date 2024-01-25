@@ -11,6 +11,7 @@ import json
 from bson import json_util
 import os
 import inspect
+
 # import re
 
 import fiftyone as fo
@@ -32,6 +33,7 @@ with add_sys_path(os.path.dirname(os.path.abspath(__file__))):
     )
     from utils import (
         _camel_to_snake,
+        _count_leading_spaces,
         _create_hash,
         _get_image_size,
         _convert_bbox_to_albumentations,
@@ -43,6 +45,7 @@ with add_sys_path(os.path.dirname(os.path.abspath(__file__))):
         _get_detections_fields,
         _get_keypoints_fields,
         _get_mask_fields,
+        _join_lines_with_indentation,
     )
 
 
@@ -385,30 +388,6 @@ def _get_target_view(ctx, target):
 ################################################
 ################################################
 ######## Transformation Input Helpers ##########
-
-
-def _count_leading_spaces(line):
-    return len(line) - len(line.lstrip())
-
-
-def _join_lines_with_indentation(lines):
-    """
-    Joins lines that are indented with the previous line.
-    """
-    joined_lines = []
-    for line in lines:
-        if not line.strip():
-            continue  # Skip empty lines
-
-        if joined_lines:
-            if _count_leading_spaces(line) > _count_leading_spaces(joined_lines[-1]):
-                joined_lines[-1] += " " + line.strip()
-            else:
-                joined_lines.append(line)
-        else:
-            joined_lines.append(line)
-
-    return joined_lines
 
 
 def _process_function_args(func):
@@ -1153,7 +1132,7 @@ class GetAlbumentationsRunInfo(foo.Operator):
         outputs = _initialize_run_output(ctx)
         view = types.View(label="Albumentations run info")
         return types.Property(outputs, view=view)
-    
+
 
 class DeleteAlbumentationsRun(foo.Operator):
     @property
@@ -1211,4 +1190,3 @@ def register(plugin):
     plugin.register(SaveLastAlbumentationsAugmentations)
     plugin.register(GetAlbumentationsRunInfo)
     plugin.register(DeleteAlbumentationsRun)
-

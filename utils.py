@@ -9,8 +9,13 @@ import fiftyone as fo
 ## for camelCase to snake_case conversion
 pattern = re.compile(r"(?<!^)(?=[A-Z])")
 
+
 def _camel_to_snake(name):
     return pattern.sub("_", name).lower()
+
+
+def _count_leading_spaces(line):
+    return len(line) - len(line.lstrip())
 
 
 def _create_hash():
@@ -29,13 +34,12 @@ def _create_hash():
     return hash
 
 
-
 def _get_image_size(sample):
     if sample.metadata is not None and sample.metadata.width is not None:
         return (sample.metadata.width, sample.metadata.height)
     else:
         return Image.open(sample.filepath).size[::-1]
-    
+
 
 def _enforce_mask_size(mask, width, height):
     """Enforce the given mask to be of the given size.
@@ -111,3 +115,24 @@ def _get_mask_fields(sample, label_fields):
             or isinstance(sample[field_name], fo.Heatmap)
         )
     ]
+
+
+def _join_lines_with_indentation(lines):
+    """
+    Joins lines that are indented (relative to previous line)
+    with the previous line.
+    """
+    joined_lines = []
+    for line in lines:
+        if not line.strip():
+            continue  # Skip empty lines
+
+        if joined_lines:
+            if _count_leading_spaces(line) > _count_leading_spaces(joined_lines[-1]):
+                joined_lines[-1] += " " + line.strip()
+            else:
+                joined_lines.append(line)
+        else:
+            joined_lines.append(line)
+
+    return joined_lines
