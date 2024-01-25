@@ -30,7 +30,6 @@ with add_sys_path(os.path.dirname(os.path.abspath(__file__))):
     )
     from utils import (
         _camel_to_snake,
-        _count_leading_spaces,
         _create_hash,
         _get_image_size,
         _convert_bbox_to_albumentations,
