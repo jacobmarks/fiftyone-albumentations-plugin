@@ -1,5 +1,7 @@
 # Albumentations Data Augmentation Plugin for FiftyOne
 
+![apply_from_saved](https://github.com/jacobmarks/fiftyone-albumentations-plugin/assets/12500356/bd2014be-bec0-4f4d-a0bd-6709921b5bb9)
+
 Traditionally, data augmentation is performed on-the-fly during training. This is great... *if* you know exactly what augmentations you want to apply to your dataset. 
 
 However, if you're just getting started with a new dataset, you may not know what augmentations are appropriate for your data. In this case, it can be helpful to apply a wide range of augmentations to your dataset and then manually inspect the results to see which augmentations are appropriate for your data.
@@ -27,6 +29,9 @@ To get started, launch the [FiftyOne App](https://docs.voxel51.com/user_guide/ap
 
 ### Applying Augmentations
 
+![apply_transforms](https://github.com/jacobmarks/fiftyone-albumentations-plugin/assets/12500356/9ce12235-1043-4ff9-b9c4-0d2d050073e5)
+
+
 Once you have a dataset loaded, you can apply augmentations to your dataset using the `augment_with_albumentations` operator. 
 
 #### Configuration Options
@@ -53,13 +58,19 @@ Each of the transforms that is composed into the augmentation transformation can
 
 ### Get Info About Last Transformation
 
+![get_last_run_info](https://github.com/jacobmarks/fiftyone-albumentations-plugin/assets/12500356/103ef7aa-7f05-4d43-ae34-e8684268fa37)
+
 When you apply an augmentation to your dataset with `augment_with_albumentations`, the operation will store a serialized version of the transformation in a [custom run](https://docs.voxel51.com/plugins/developing_plugins.html#storing-custom-runs) on your dataset. You can view the last transformation that was applied to your dataset by using the `get_last_albumentations_run_info` operator. This will open an output modal with a formatted snapshot of the last transformation that was applied to your dataset.
 
 ### View Last Augmentation
 
+![view_last_augmentation](https://github.com/jacobmarks/fiftyone-albumentations-plugin/assets/12500356/12e0792d-71fc-489e-b951-fd11d6901c9e)
+
 In addition to storing the last transformation that was applied to your dataset, the `augment_with_albumentations` operation will retain a reference list of all of the samples that were created by the last augmentation that was applied to your dataset. You can view the last augmentation that was applied to your dataset by using the `view_last_albumentations_run` operator.
 
 ### Saving Transformations
+
+![save_transform](https://github.com/jacobmarks/fiftyone-albumentations-plugin/assets/12500356/9cce264a-b23a-4b20-bc87-de682dbdec98)
 
 If you find a set of hyperparameters that you like and want to save them for later use, you can save the transformation that was applied to your dataset by using the `save_albumentations_transformation` operator. You will be prompted to enter a name for the transformation — choose something that will help you remember what the transformation does.
 
@@ -74,6 +85,8 @@ By default, each time a new augmentation is applied to your dataset, all of the 
 If you find a set of augmentations that you like, you can persist them to your dataset by using the `save_albumentations_augmentations` operator.
 
 ### Get Info About Saved Transformations
+
+![get_saved_info](https://github.com/jacobmarks/fiftyone-albumentations-plugin/assets/12500356/296e0234-e75d-46a1-92ff-324b59ceb23b)
 
 You can view the transformations that have been saved to your dataset by using the `get_albumentations_run_info` operator and selecting the name of the transformation that you want info about from the dropdown.
 
