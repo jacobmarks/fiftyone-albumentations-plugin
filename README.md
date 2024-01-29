@@ -18,6 +18,18 @@ The plugin currently supports image media types. For images, it has support for 
 - [Semantic Segmentation](https://docs.voxel51.com/user_guide/using_datasets.html#semantic-segmentation)
 - [Heatmap](https://docs.voxel51.com/user_guide/using_datasets.html#heatmaps)
 
+## Installation
+
+```shell
+fiftyone plugins download https://github.com/jacobmarks/fiftyone-albumentations-plugin
+```
+
+You will also need to make sure that Albumentations is installed:
+
+```shell
+pip install albumentations
+```
+
 
 ## Usage
 
@@ -95,14 +107,3 @@ You can view the transformations that have been saved to your dataset by using t
 You can delete a saved transformation from your dataset by using the `delete_albumentations_run` operator and selecting the name of the transformation that you want to delete from the dropdown.
 
 
-## Installation
-
-```shell
-fiftyone plugins download https://github.com/jacobmarks/fiftyone-albumentations-plugin
-```
-
-You will also need to make sure that Albumentations is installed:
-
-```shell
-pip install albumentations
-```
