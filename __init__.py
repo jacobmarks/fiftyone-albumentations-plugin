@@ -306,7 +306,7 @@ def transform_sample(sample, transform, label_fields=False, new_filepath=None):
         transformed_keypoint_labels = transformed["keypoint_labels"]
         transformed_keypoints_dict = {
             kp_id: _convert_keypoint_from_albumentations(
-                kp, [image.shape[1], image.shape[0]]
+                kp, [transformed_image.shape[0], transformed_image.shape[1]]
             )
             for kp_id, kp in zip(transformed_keypoint_labels, transformed_keypoints)
         }
