@@ -125,7 +125,8 @@ def _collect_masks(sample, mask_fields, detections_fields):
             else:
                 mask = mask_label.map
 
-        mask = _enforce_mask_size(mask, width, height)
+        mask = _enforce_mask_size(mask, height, width)
+                
         masks_dict[str(mask_label._id)] = mask
 
     ## Add instance masks to the masks dict
