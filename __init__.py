@@ -694,7 +694,6 @@ def _cleanup_last_transform(dataset):
 def _store_last_transform(
     transform, dataset, target_view, label_fields, new_sample_ids
 ):
-    _cleanup_last_transform(dataset)
     run_key = LAST_ALBUMENTATIONS_RUN_KEY
     transform_dict = transform.to_dict()
 
@@ -877,6 +876,7 @@ class AugmentWithAlbumentations(foo.Operator):
         label_fields = True
 
         target = ctx.params.get("target", None)
+        _cleanup_last_transform(ctx.dataset)
         target_view = _get_target_view(ctx, target)
 
         new_sample_ids = []
