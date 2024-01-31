@@ -242,7 +242,7 @@ def _update_keypoints_field(
     return new_sample
 
 
-def transform_sample(sample, transform, label_fields=False, new_filepath=None):
+def transform_sample(sample, transforms, label_fields=False, new_filepath=None):
     """Apply an Albumentations transform to the image
     and all label fields listed for the sample.
 
@@ -295,6 +295,19 @@ def transform_sample(sample, transform, label_fields=False, new_filepath=None):
     else:
         kwargs["keypoints"] = []
         kwargs["keypoint_labels"] = []
+
+    compose_kwargs = {}
+    if has_boxes:
+        compose_kwargs["bbox_params"] = A.BboxParams(format="albumentations")
+    if has_keypoints:
+        compose_kwargs["keypoint_params"] = A.KeypointParams(
+            format="xy", label_fields=["keypoint_labels"], remove_invisible=True
+        )
+
+    transform = A.Compose(
+        transforms,
+        **compose_kwargs,
+    )
 
     transformed = transform(**kwargs)
 
@@ -777,6 +790,63 @@ def _transform_source_input(ctx, inputs, num=0):
     )
 
 
+def _label_fields_input(ctx, inputs):
+    if ctx.selected:
+        sample = ctx.dataset.select(ctx.selected[0]).first()
+    else:
+        sample = ctx.view.first()
+
+    label_fields = _get_label_fields(sample)
+
+    if not label_fields:
+        return
+    elif len(label_fields) == 1:
+        inputs.bool(
+            "label_fields",
+            label="Transform label field",
+            description=f"Check to transform the label field '{label_fields[0]}'",
+            default=True,
+            view=types.CheckboxView(),
+        )
+    else:
+        inputs.view(
+            "labels_header", 
+            types.Header(label="Select Labels", divider=True)
+        )
+        inputs.bool(
+            "label_fields",
+            label="Transform all label fields",
+            description="Check to transform all label fields along with the image",
+            default=True,
+            view=types.CheckboxView(),
+        )
+
+        if ctx.params.get("label_fields", True):
+            return
+        
+        for lf in label_fields:
+            inputs.bool(
+                f"label_field__{lf}",
+                label=f"Transform {lf}?",
+                default=False,
+                view=types.CheckboxView(spaces=3),
+            )
+
+
+def _get_label_fields_to_transform(ctx):
+    if ctx.params.get("label_fields", True):
+        sample = ctx.dataset.select(ctx.selected[0]).first()
+        label_fields = _get_label_fields(sample)
+        return label_fields
+    else:
+        label_fields = []
+        for param in ctx.params:
+            if param.startswith("label_field__"):
+                if ctx.params[param]:
+                    label_fields.append(param[len("label_field__") :])
+        return label_fields
+
+
 class AugmentWithAlbumentations(foo.Operator):
     @property
     def config(self):
@@ -804,18 +874,6 @@ class AugmentWithAlbumentations(foo.Operator):
             view=types.FieldView(),
         )
 
-        # inputs.bool(
-        #     "label_fields",
-        #     label="Label fields",
-        #     description=(
-        #         "A field or list of field names to transform. If label_fields=False, "
-        #         "no label fields are transformed. If label_fields=True, all label "
-        #         "fields are transformed.",
-        #     ),
-        #     default=False,
-        #     view=types.CheckboxView(),
-        # )
-
         inputs.int(
             "num_transforms",
             label="Number of transforms",
@@ -823,6 +881,8 @@ class AugmentWithAlbumentations(foo.Operator):
             default=1,
             required=True,
         )
+
+        _label_fields_input(ctx, inputs)
 
         num_transforms = ctx.params.get("num_transforms", 1)
         if num_transforms is not None and num_transforms < 1:
@@ -880,17 +940,17 @@ class AugmentWithAlbumentations(foo.Operator):
                 ]
                 transforms.extend(new_transforms)
 
-        transform = A.Compose(
-            transforms,
-            bbox_params=A.BboxParams(format="albumentations"),
-            keypoint_params=A.KeypointParams(
-                format="xy", label_fields=["keypoint_labels"], remove_invisible=True
-            ),
-        )
+        # transform = A.Compose(
+        #     transforms,
+        #     bbox_params=A.BboxParams(format="albumentations"),
+        #     keypoint_params=A.KeypointParams(
+        #         format="xy", label_fields=["keypoint_labels"], remove_invisible=True
+        #     ),
+        # )
 
         num_augs = ctx.params.get("num_augs", 1)
 
-        label_fields = True
+        label_fields = _get_label_fields_to_transform(ctx)
 
         target = ctx.params.get("target", None)
         _cleanup_last_transform(ctx.dataset)
@@ -900,7 +960,7 @@ class AugmentWithAlbumentations(foo.Operator):
 
         for sample in target_view:
             for _ in range(num_augs):
-                new_sample_id = transform_sample(sample, transform, label_fields)
+                new_sample_id = transform_sample(sample, transforms, label_fields)
                 new_sample_ids.append(new_sample_id)
 
         _store_last_transform(
