@@ -939,14 +939,6 @@ class AugmentWithAlbumentations(foo.Operator):
                 ]
                 transforms.extend(new_transforms)
 
-        # transform = A.Compose(
-        #     transforms,
-        #     bbox_params=A.BboxParams(format="albumentations"),
-        #     keypoint_params=A.KeypointParams(
-        #         format="xy", label_fields=["keypoint_labels"], remove_invisible=True
-        #     ),
-        # )
-
         num_augs = ctx.params.get("num_augs", 1)
 
         label_fields = _get_label_fields_to_transform(ctx)
