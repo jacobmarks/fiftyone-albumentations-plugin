@@ -809,10 +809,7 @@ def _label_fields_input(ctx, inputs):
             view=types.CheckboxView(),
         )
     else:
-        inputs.view(
-            "labels_header", 
-            types.Header(label="Select Labels", divider=True)
-        )
+        inputs.view("labels_header", types.Header(label="Select Labels", divider=True))
         inputs.bool(
             "label_fields",
             label="Transform all label fields",
@@ -823,7 +820,7 @@ def _label_fields_input(ctx, inputs):
 
         if ctx.params.get("label_fields", True):
             return
-        
+
         for lf in label_fields:
             inputs.bool(
                 f"label_field__{lf}",
