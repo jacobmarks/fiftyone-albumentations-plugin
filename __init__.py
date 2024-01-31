@@ -325,6 +325,8 @@ def transform_sample(sample, transforms, label_fields=False, new_filepath=None):
         transformed_masks_dict = {
             id: mask for id, mask in zip(masks_dict.keys(), transformed_masks)
         }
+    else:
+        transformed_masks_dict = {}
 
     if has_keypoints:
         transformed_keypoints = transformed["keypoints"]
