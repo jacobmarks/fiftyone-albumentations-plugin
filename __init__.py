@@ -126,7 +126,7 @@ def _collect_masks(sample, mask_fields, detections_fields):
                 mask = mask_label.map
 
         mask = _enforce_mask_size(mask, height, width)
-                
+
         masks_dict[str(mask_label._id)] = mask
 
     ## Add instance masks to the masks dict
@@ -136,17 +136,27 @@ def _collect_masks(sample, mask_fields, detections_fields):
             mask = det.mask
             if mask is None:
                 continue
-            mask = _enforce_mask_size(mask, width, height)
+            mask = _project_instance_mask(mask, det.bounding_box, (width, height))
             masks_dict[str(det._id)] = mask
 
     return masks_dict
 
 
-# def _crop_instance_mask(mask, bbox, frame_size):
-#     det = fo.Detection(mask=mask, bounding_box=bbox)
-#     seg = det.to_segmentation(frame_size=frame_size)
-#     # seg = fo.Segmentation(mask=mask)
-#     return seg.to_detections().detections[0].mask
+def _project_instance_mask(mask, bbox, frame_size):
+    det = fo.Detection(mask=mask, bounding_box=bbox)
+    seg = det.to_segmentation(frame_size=frame_size)
+    return seg.mask.astype(np.uint8) / 255
+
+
+def _crop_instance_mask(mask, bbox):
+    alb_bbox = _convert_bbox_to_albumentations(bbox)
+    x1, y1, x2, y2 = alb_bbox
+    img_size = mask.shape
+    im = Image.fromarray(mask)
+    im_cropped = im.crop(
+        (x1 * img_size[1], y1 * img_size[0], x2 * img_size[1], y2 * img_size[0])
+    )
+    return np.array(im_cropped)
 
 
 def _collect_keypoints(sample, keypoints_fields):
@@ -168,7 +178,11 @@ def _collect_keypoints(sample, keypoints_fields):
 
 
 def _update_detection_field(
-    original_sample, new_sample, detection_field, transformed_boxes
+    original_sample,
+    new_sample,
+    detection_field,
+    transformed_boxes,
+    transformed_masks_dict,
 ):
     detections = original_sample[detection_field].detections
     new_detections = []
@@ -182,12 +196,10 @@ def _update_detection_field(
             if new_det.mask is not None:
                 new_det.mask = None
             ## Add instance masks to the new detections
-            # if str(det._id) in transformed_masks_dict:
-            #     full_mask = transformed_masks_dict[str(det._id)]
-            #     instance_mask = _crop_instance_mask(
-            #         full_mask, new_det.bounding_box, (image.shape[1], image.shape[0])
-            #         )
-            #     new_det.mask = instance_mask
+            if str(det._id) in transformed_masks_dict:
+                full_mask = transformed_masks_dict[str(det._id)]
+                instance_mask = _crop_instance_mask(full_mask, new_det.bounding_box)
+                new_det.mask = instance_mask
 
             new_detections.append(new_det)
     new_sample[detection_field] = fo.Detections(detections=new_detections)
@@ -318,7 +330,11 @@ def transform_sample(sample, transform, label_fields=False, new_filepath=None):
     if has_boxes:
         for detection_field in detection_fields:
             new_sample = _update_detection_field(
-                sample, new_sample, detection_field, transformed_boxes
+                sample,
+                new_sample,
+                detection_field,
+                transformed_boxes,
+                transformed_masks_dict,
             )
 
     if has_masks:
@@ -837,7 +853,7 @@ class AugmentWithAlbumentations(foo.Operator):
         _list_target_views(ctx, inputs)
         _execution_mode(ctx, inputs)
         return types.Property(inputs, view=form_view)
-    
+
     def resolve_delegation(self, ctx):
         return ctx.params.get("delegate", False)
 
