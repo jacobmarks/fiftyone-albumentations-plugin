@@ -125,7 +125,7 @@ def _collect_masks(sample, mask_fields, detections_fields):
             else:
                 mask = mask_label.map
 
-        mask = _enforce_mask_size(mask, height, width)
+        mask = _enforce_mask_size(mask, width, height)
 
         masks_dict[str(mask_label._id)] = mask
 
@@ -340,7 +340,7 @@ def transform_sample(sample, transforms, label_fields=False, new_filepath=None):
 
     transformed_image = cv2.cvtColor(transformed_image, cv2.COLOR_RGB2BGR)
     cv2.imwrite(new_filepath, transformed_image)
-    new_sample = fo.Sample(filepath=new_filepath)
+    new_sample = fo.Sample(filepath=new_filepath, tags=['augmented'])
 
     if has_boxes:
         for detection_field in detection_fields:
