@@ -304,12 +304,13 @@ def transform_sample(sample, transforms, label_fields=False, new_filepath=None):
             format="xy", label_fields=["keypoint_labels"], remove_invisible=True
         )
 
-    transform = A.Compose(
+    transform = A.ReplayCompose(
         transforms,
         **compose_kwargs,
     )
 
     transformed = transform(**kwargs)
+    transform_record = transformed['replay']
 
     transformed_image = transformed["image"]
 
@@ -340,7 +341,9 @@ def transform_sample(sample, transforms, label_fields=False, new_filepath=None):
 
     transformed_image = cv2.cvtColor(transformed_image, cv2.COLOR_RGB2BGR)
     cv2.imwrite(new_filepath, transformed_image)
-    new_sample = fo.Sample(filepath=new_filepath, tags=['augmented'])
+
+    
+    new_sample = fo.Sample(filepath=new_filepath, tags=['augmented'], transform=transform_record)
 
     if has_boxes:
         for detection_field in detection_fields:
