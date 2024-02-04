@@ -596,7 +596,7 @@ def _get_albumentations_run_names(ctx):
 
 
 def _transforms_from_primitive_input(ctx, inputs, num=0):
-    transform_choices = SUPPORTED_TRANSFORMS
+    transform_choices = sorted(SUPPORTED_TRANSFORMS)
     transforms_group = types.RadioGroup()
 
     for tc in transform_choices:
@@ -793,7 +793,7 @@ def _transform_source_input(ctx, inputs, num=0):
 
 
 def _label_fields_input(ctx, inputs):
-    if ctx.selected:
+    if ctx.selected and len(ctx.selected) > 0:
         sample = ctx.dataset.select(ctx.selected[0]).first()
     else:
         sample = ctx.view.first()
@@ -834,7 +834,10 @@ def _label_fields_input(ctx, inputs):
 
 def _get_label_fields_to_transform(ctx):
     if ctx.params.get("label_fields", True):
-        sample = ctx.dataset.select(ctx.selected[0]).first()
+        if ctx.selected:
+            sample = ctx.dataset.select(ctx.selected[0]).first()
+        else:
+            sample = ctx.view.first()
         label_fields = _get_label_fields(sample)
         return label_fields
     else:
