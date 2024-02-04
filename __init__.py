@@ -863,6 +863,13 @@ class AugmentWithAlbumentations(foo.Operator):
 
     def resolve_input(self, ctx):
         inputs = types.Object()
+        if not ctx.dataset or not ctx.view:
+            inputs.view(
+                "no_dataset_warning", 
+                types.Warning(label="No dataset", description="Need dataset to apply an Albumentations transform")
+            )
+            return types.Property(inputs)
+        
         form_view = types.View(
             label="Augment with Albumentations",
             description="Apply an Albumentations transform to the image and all label fields listed for the sample.",
