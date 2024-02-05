@@ -643,10 +643,10 @@ def _format_transform(config):
     transform = config.get("transform", {})
     if "transform" in transform:
         transform = transform["transform"].copy()
-        transform.pop("bbox_params", None)
-        transform.pop("keypoint_params", None)
-        transform.pop("additional_targets", None)
-        transform.pop("is_check_shapes", None)
+    
+    for key in ("bbox_params", "keypoint_params", "additional_targets", "is_check_shapes"):
+        if key in transform:
+            transform.pop(key, None)
     return transform
 
 
@@ -727,10 +727,12 @@ def _cleanup_last_transform(dataset):
 
 
 def _store_last_transform(
-    transform, dataset, target_view, label_fields, new_sample_ids
+    transforms, dataset, target_view, label_fields, new_sample_ids
 ):
     run_key = LAST_ALBUMENTATIONS_RUN_KEY
-    transform_dict = transform.to_dict()
+    # transform_dict = transform.to_dict()
+    # transform_dict = {"transform": transform}
+    transform_dict = A.Compose(transforms).to_dict()
 
     config = dataset.init_run()
     config.transform = transform_dict
@@ -968,7 +970,7 @@ class AugmentWithAlbumentations(foo.Operator):
                 new_sample_ids.append(new_sample_id)
 
         _store_last_transform(
-            transform, ctx.dataset, target_view, label_fields, new_sample_ids
+            transforms, ctx.dataset, target_view, label_fields, new_sample_ids
         )
         ctx.trigger("reload_dataset")
 
