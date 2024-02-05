@@ -311,6 +311,7 @@ def transform_sample(sample, transforms, label_fields=False, new_filepath=None):
 
     transformed = transform(**kwargs)
     transform_record = transformed['replay']
+    transform_record['transformed_sample_id'] = sample.id
 
     transformed_image = transformed["image"]
 
