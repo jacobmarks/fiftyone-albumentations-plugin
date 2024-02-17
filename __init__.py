@@ -212,13 +212,13 @@ def _update_mask_field(original_sample, new_sample, mask_field, transformed_mask
     if isinstance(new_mask_label, fo.Segmentation):
         if new_mask_label.mask_path is not None:
             new_mask_label["mask_path"] = None
-        else:
-            new_mask_label["mask"] = transformed_masks_dict[mid]
+        # else:
+        new_mask_label["mask"] = transformed_masks_dict[mid]
     elif isinstance(new_mask_label, fo.Heatmap):
         if new_mask_label.map_path is not None:
             new_mask_label["map_path"] = None
-        else:
-            new_mask_label["map"] = transformed_masks_dict[mid]
+        # else:
+        new_mask_label["map"] = transformed_masks_dict[mid]
     new_sample[mask_field] = new_mask_label
     return new_sample
 
@@ -271,6 +271,7 @@ def transform_sample(sample, transforms, label_fields=False, new_filepath=None):
     boxes_list = _collect_bboxes(sample, detection_fields)
 
     mask_fields = _get_mask_fields(sample, label_fields)
+
 
     masks_dict = _collect_masks(sample, mask_fields, detection_fields)
     masks = list(masks_dict.values())

@@ -3,6 +3,7 @@ from PIL import Image
 import numpy as np
 import random
 import re
+import torch
 
 import fiftyone as fo
 from fiftyone.operators import types
@@ -86,7 +87,15 @@ def _enforce_mask_size(mask, width, height):
         a numpy array representing the mask of the given size
     """
     if mask.shape != (height, width):
-        mask = np.array(Image.fromarray(mask.astype(np.uint8)).resize((width, height)))
+        tensor_mask_4d = torch.tensor(mask).unsqueeze(0).unsqueeze(0)
+        prediction = torch.nn.functional.interpolate(
+            tensor_mask_4d,
+            size=(height, width),
+            mode="bicubic",
+            align_corners=False,
+        )
+        mask = torch.clamp(prediction, min=0, max=1).squeeze().detach().numpy()
+
     return mask
 
 
