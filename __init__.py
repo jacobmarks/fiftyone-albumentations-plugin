@@ -33,7 +33,6 @@ with add_sys_path(os.path.dirname(os.path.abspath(__file__))):
         _create_hash,
         _execution_mode,
         _get_image_size,
-        _get_target_view,
         _convert_bbox_to_albumentations,
         _convert_bbox_from_albumentations,
         _convert_keypoint_to_albumentations,
@@ -44,7 +43,6 @@ with add_sys_path(os.path.dirname(os.path.abspath(__file__))):
         _get_keypoints_fields,
         _get_mask_fields,
         _join_lines_with_indentation,
-        _list_target_views,
     )
 
 
@@ -732,8 +730,6 @@ def _store_last_transform(
     transforms, dataset, target_view, label_fields, new_sample_ids
 ):
     run_key = LAST_ALBUMENTATIONS_RUN_KEY
-    # transform_dict = transform.to_dict()
-    # transform_dict = {"transform": transform}
     transform_dict = A.Compose(transforms).to_dict()
 
     config = dataset.init_run()
@@ -926,7 +922,7 @@ class AugmentWithAlbumentations(foo.Operator):
                 except:
                     pass
 
-        _list_target_views(ctx, inputs)
+        inputs.view_target(ctx)
         _execution_mode(ctx, inputs)
         return types.Property(inputs, view=form_view)
 
@@ -960,9 +956,8 @@ class AugmentWithAlbumentations(foo.Operator):
 
         label_fields = _get_label_fields_to_transform(ctx)
 
-        target = ctx.params.get("target", None)
         _cleanup_last_transform(ctx.dataset)
-        target_view = _get_target_view(ctx, target)
+        target_view = ctx.target_view()
 
         new_sample_ids = []
 
