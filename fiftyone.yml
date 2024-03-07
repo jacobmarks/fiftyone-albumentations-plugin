@@ -1,5 +1,5 @@
 fiftyone:
-  version: ">=0.23.6"
+  version: ">=0.23.5"
 name: "@jacobmarks/albumentations_augmentation"
 version: "1.0.2"
 description: "Test out various Albumentations transformations on your data!"

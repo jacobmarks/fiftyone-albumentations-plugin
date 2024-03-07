@@ -33,6 +33,7 @@ with add_sys_path(os.path.dirname(os.path.abspath(__file__))):
         _create_hash,
         _execution_mode,
         _get_image_size,
+        _get_target_view,
         _convert_bbox_to_albumentations,
         _convert_bbox_from_albumentations,
         _convert_keypoint_to_albumentations,
@@ -43,6 +44,7 @@ with add_sys_path(os.path.dirname(os.path.abspath(__file__))):
         _get_keypoints_fields,
         _get_mask_fields,
         _join_lines_with_indentation,
+        _list_target_views,
     )
 
 
@@ -926,7 +928,8 @@ class AugmentWithAlbumentations(foo.Operator):
                 except:
                     pass
 
-        inputs.view_target(ctx)
+        # inputs.view_target(ctx)
+        _list_target_views(ctx, inputs)
         _execution_mode(ctx, inputs)
         return types.Property(inputs, view=form_view)
 
@@ -960,8 +963,10 @@ class AugmentWithAlbumentations(foo.Operator):
 
         label_fields = _get_label_fields_to_transform(ctx)
 
+        target = ctx.params.get("target", None)
         _cleanup_last_transform(ctx.dataset)
-        target_view = ctx.target_view()
+        # target_view = ctx.target_view()
+        target_view = _get_target_view(ctx, target)
 
         new_sample_ids = []
 

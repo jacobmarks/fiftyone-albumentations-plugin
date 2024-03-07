@@ -180,3 +180,50 @@ def _join_lines_with_indentation(lines):
 
     return joined_lines
 
+
+def _list_target_views(ctx, inputs):
+    has_view = ctx.view != ctx.dataset.view()
+    has_selected = bool(ctx.selected)
+    default_target = "DATASET"
+    if has_view or has_selected:
+        target_choices = types.RadioGroup()
+        target_choices.add_choice(
+            "DATASET",
+            label="Entire dataset",
+            description="Run on the entire dataset",
+        )
+
+        if has_view:
+            target_choices.add_choice(
+                "CURRENT_VIEW",
+                label="Current view",
+                description="Run on the current view",
+            )
+            default_target = "CURRENT_VIEW"
+
+        if has_selected:
+            target_choices.add_choice(
+                "SELECTED_SAMPLES",
+                label="Selected samples",
+                description="Run on the selected samples",
+            )
+            default_target = "SELECTED_SAMPLES"
+
+        inputs.enum(
+            "target",
+            target_choices.values(),
+            default=default_target,
+            view=target_choices,
+        )
+    else:
+        ctx.params["target"] = "DATASET"
+
+
+def _get_target_view(ctx, target):
+    if target == "SELECTED_SAMPLES":
+        return ctx.view.select(ctx.selected)
+
+    if target == "DATASET":
+        return ctx.dataset
+
+    return ctx.view
