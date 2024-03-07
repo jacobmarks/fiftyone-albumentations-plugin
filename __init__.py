@@ -70,6 +70,10 @@ SUPPORTED_TRANSFORMS = (
 def serialize_view(view):
     return json.loads(json_util.dumps(view._serialize()))
 
+def get_filepath(sample):
+    return (
+        sample.local_path if hasattr(sample, "local_path") else sample.filepath
+    )
 
 def _collect_bboxes(sample, label_fields):
     """Collect all bounding boxes from the given sample.
@@ -263,7 +267,7 @@ def transform_sample(sample, transforms, label_fields=False, new_filepath=None):
     if label_fields is True:
         label_fields = _get_label_fields(sample)
 
-    image = cv2.cvtColor(cv2.imread(sample.filepath), cv2.COLOR_BGR2RGB)
+    image = cv2.cvtColor(cv2.imread(get_filepath(sample)), cv2.COLOR_BGR2RGB)
 
     detection_fields = _get_detections_fields(sample, label_fields)
     boxes_list = _collect_bboxes(sample, detection_fields)
