@@ -47,15 +47,53 @@ with add_sys_path(os.path.dirname(os.path.abspath(__file__))):
 
 
 NAME_TO_TYPE = {
-    "scale": "float",
-    "slant_lower": "int",
-    "slant_upper": "int",
-    "drop_length": "int",
-    "drop_width": "int",
-    "translate_percent": "float",
-    "translate_px": "int",
-    "rotate": "float",
-    "shear": "float",
+    'alpha': 'float',
+    'alpha_coef': 'float',
+    'always_apply': 'bool',
+    'blur_limit': 'int',
+    'by_channels': 'bool',
+    'clip_limit': 'float',
+    'cutoff': 'float',
+    'drop_length': 'int',
+    'drop_width': 'int',
+    'elementwise': 'bool',
+    'erosion_rate': 'float',
+    'fog_coef_lower': 'float',
+    'fog_coef_upper': 'float',
+    'gamma_limit': 'float',
+    'height': 'int',
+    'hue_shift_limit': 'int',
+    'lightness': 'float',
+    'max_pixel_value': 'float',
+    'max_size': 'int',
+    'mean': 'float',
+    'multiplier': 'float',
+    'n_segments': 'int',
+    'p': 'float',
+    'p_replace': 'float',
+    'quality_lower': 'int',
+    'quality_upper': 'int',
+    'ratio': 'float',
+    'rotate': 'float',
+    'sat_shift_limit': 'int',
+    'scale': 'float',
+    'scale_max': 'float',
+    'scale_min': 'float',
+    'shear': 'float',
+    'slant_lower': 'int',
+    'slant_upper': 'int',
+    'std': 'float',
+    'threshold': 'float',
+    'tile_grid_size': 'int',
+    'translate_percent': 'float',
+    'translate_px': 'int',
+    'val_shift_limit': 'int',
+    'var_limit': 'float',
+    'width': 'int',
+    'x_max': 'int',
+    'x_min': 'int',
+    'y_max': 'int',
+    'y_min': 'int'
 }
 
 SUPPORTED_TRANSFORMS = (
@@ -479,9 +517,9 @@ def _get_input_factory(inputs, arg_type):
 
 
 def _add_transform_inputs(inputs, transform_name):
-    transform_args = _process_function_args(getattr(A, transform_name))
+    transform_args = _process_function_args(getattr(A.augmentations, transform_name))
 
-    t = getattr(A, transform_name)
+    t = getattr(A.augmentations, transform_name)
     camel_case_name = _camel_to_snake(transform_name)
 
     parameters = inspect.signature(t).parameters
@@ -542,7 +580,7 @@ def _unwrap_dict_tuples(args, kwargs):
 def _create_transform(ctx, transform_name):
     input_dict = _extract_transform_inputs(ctx, transform_name)
 
-    t = getattr(A, transform_name)
+    t = getattr(A.augmentations, transform_name)
     params = inspect.signature(t).parameters
 
     args = []
