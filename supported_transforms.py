@@ -24,7 +24,6 @@ SUPPORTED_CROP_TRANSFORMS = (
 SUPPORTED_DROPOUT_TRANSFORMS = (
     "ChannelDropout",
     "CoarseDropout",
-    "Cutout",
     # "GridDropout",
     # "MaskDropout",
 )
@@ -43,14 +42,11 @@ SUPPORTED_FUNCTIONAL_TRANSFORMS = (
     "ImageCompression",
     "InvertImg",
     "ISONoise",
-    "JpegCompression",
     "MultiplicativeNoise",
     "Normalize",
     "PixelDropout",
     "Posterize",
-    "RandomBrightness",
     "RandomBrightnessContrast",
-    "RandomContrast",
     "RandomFog",
     "RandomGamma",
     # "RandomGravel",
