@@ -84,7 +84,7 @@ In addition to storing the last transformation that was applied to your dataset,
 
 ![save_transform](https://github.com/jacobmarks/fiftyone-albumentations-plugin/assets/12500356/9cce264a-b23a-4b20-bc87-de682dbdec98)
 
-If you find a set of hyperparameters that you like and want to save them for later use, you can save the transformation that was applied to your dataset by using the `save_albumentations_transformation` operator. You will be prompted to enter a name for the transformation — choose something that will help you remember what the transformation does.
+If you find a set of hyperparameters that you like and want to save them for later use, you can save the transformation that was applied to your dataset by using the `save_albumentations_transform` operator. You will be prompted to enter a name for the transformation — choose something that will help you remember what the transformation does.
 
 Once you have saved the transformation, it will then be available to select from the `Saved Transformations` dropdown when you apply augmentations to your dataset.
 
