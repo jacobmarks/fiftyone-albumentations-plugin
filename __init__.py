@@ -1,13 +1,11 @@
 """Albumentations image augmentation plugin.
 """
 
-from bson import json_util
 import inspect
 import os
 
 import albumentations as A
 import cv2
-import json
 import numpy as np
 from PIL import Image
 
@@ -104,9 +102,6 @@ SUPPORTED_TRANSFORMS = (
     *SUPPORTED_FUNCTIONAL_TRANSFORMS,
 )
 
-
-def serialize_view(view):
-    return json.loads(json_util.dumps(view._serialize()))
 
 def get_filepath(sample):
     return (
@@ -1011,7 +1006,7 @@ class AugmentWithAlbumentations(foo.Operator):
         _store_last_transform(
             transforms, ctx.dataset, target_view, label_fields, new_sample_ids
         )
-        ctx.trigger("reload_dataset")
+        ctx.ops.reload_dataset()
 
 
 class GetLastAlbumentationsRunInfo(foo.Operator):
@@ -1077,12 +1072,7 @@ class ViewLastAlbumentationsRun(foo.Operator):
         results = ctx.dataset.load_run_results(run_key)
         new_sample_ids = results.new_sample_ids
         view = ctx.dataset.select(new_sample_ids)
-
-        ctx.trigger(
-            "set_view",
-            params=dict(view=serialize_view(view)),
-        )
-
+        ctx.ops.set_view(view=view)
 
 class SaveLastAlbumentationsTransform(foo.Operator):
     @property
@@ -1135,7 +1125,7 @@ class SaveLastAlbumentationsTransform(foo.Operator):
         transform = ctx.dataset.get_run_info(last_run_key).config.transform
         name = ctx.params.get("name", None)
         _save_transform(ctx.dataset, transform, name)
-        ctx.trigger("reload_dataset")
+        ctx.ops.reload_dataset()
 
 
 class SaveLastAlbumentationsAugmentations(foo.Operator):
@@ -1155,7 +1145,7 @@ class SaveLastAlbumentationsAugmentations(foo.Operator):
 
     def execute(self, ctx):
         _save_augmentations(ctx)
-        ctx.trigger("reload_dataset")
+        ctx.ops.reload_dataset()
 
 
 class GetAlbumentationsRunInfo(foo.Operator):
@@ -1255,7 +1245,7 @@ class DeleteAlbumentationsRun(foo.Operator):
         run_name = ctx.params.get("run_name", None)
         run_key = _get_run_key_from_name(ctx, run_name)
         ctx.dataset.delete_run(run_key)
-        ctx.trigger("reload_dataset")
+        ctx.ops.reload_dataset()
 
 
 def register(plugin):
