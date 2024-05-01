@@ -763,6 +763,26 @@ def _cleanup_last_transform(dataset):
     dataset.delete_samples(ids)
 
 
+class CleanupLastAlbumentationsRun(foo.Operator):
+    @property
+    def config(self):
+        return foo.OperatorConfig(
+            name="cleanup_last_albumentations_run",
+            label="Cleanup last Albumentations run",
+            icon="/assets/icon.svg",
+            unlisted=True,
+            on_dataset_open=True,
+        )
+
+    def resolve_input(self, ctx):
+        inputs = types.Object()
+        view = types.View(label="Cleanup last Albumentations run")
+        return types.Property(inputs, view=view)
+
+    def execute(self, ctx):
+        _cleanup_last_transform(ctx.dataset)
+
+
 def _store_last_transform(
     transforms, dataset, target_view, label_fields, new_sample_ids
 ):
@@ -1256,3 +1276,4 @@ def register(plugin):
     plugin.register(SaveLastAlbumentationsAugmentations)
     plugin.register(GetAlbumentationsRunInfo)
     plugin.register(DeleteAlbumentationsRun)
+    plugin.register(CleanupLastAlbumentationsRun)
