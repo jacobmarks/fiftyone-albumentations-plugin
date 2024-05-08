@@ -106,4 +106,6 @@ You can view the transformations that have been saved to your dataset by using t
 
 You can delete a saved transformation from your dataset by using the `delete_albumentations_run` operator and selecting the name of the transformation that you want to delete from the dropdown.
 
+### Cleanup Temporary Files
 
+You can explicitly cleanup the temporary files that were created to store the samples that were created by the last augmentation that was applied to your dataset by using the `cleanup_last_albumentations_run` operator.

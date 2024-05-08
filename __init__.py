@@ -17,6 +17,7 @@ from fiftyone.core.utils import add_sys_path
 LAST_ALBUMENTATIONS_RUN_KEY = "_last_albumentations_run"
 ALBUMENTATIONS_RUN_INDICATOR = "albumentations_transform_"
 
+
 with add_sys_path(os.path.dirname(os.path.abspath(__file__))):
     # pylint: disable=no-name-in-module,import-error
     from supported_transforms import (
@@ -300,9 +301,10 @@ def transform_sample(sample, transforms, label_fields=False, new_filepath=None):
     Currently does not handle:
     - instance segmentation masks.
     """
-    if new_filepath is None:
+    if new_filepath is None or new_filepath == None:
         hash = _create_hash()
         new_filepath = f"/tmp/{hash}.jpg"
+
 
     if not label_fields:
         label_fields = []
@@ -348,6 +350,8 @@ def transform_sample(sample, transforms, label_fields=False, new_filepath=None):
         compose_kwargs["keypoint_params"] = A.KeypointParams(
             format="xy", label_fields=["keypoint_labels"], remove_invisible=True
         )
+    else:
+        compose_kwargs["keypoint_params"] = A.KeypointParams(format='xy')
 
     transform = A.ReplayCompose(
         transforms,
@@ -779,8 +783,6 @@ class CleanupLastAlbumentationsRun(foo.Operator):
             name="cleanup_last_albumentations_run",
             label="Cleanup last Albumentations run",
             icon="/assets/icon.svg",
-            unlisted=True,
-            on_dataset_open=True,
         )
 
     def resolve_input(self, ctx):
@@ -790,6 +792,7 @@ class CleanupLastAlbumentationsRun(foo.Operator):
 
     def execute(self, ctx):
         _cleanup_last_transform(ctx.dataset)
+        ctx.ops.reload_dataset()
 
 
 def _store_last_transform(
