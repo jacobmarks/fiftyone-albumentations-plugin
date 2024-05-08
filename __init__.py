@@ -287,6 +287,19 @@ def _update_keypoints_field(
     return new_sample
 
 
+def _serialize_transform_record(transform_record):
+    def replace_position_types(data):
+        if isinstance(data, dict):
+            return {k: replace_position_types(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [replace_position_types(item) for item in data]
+        elif data.__class__.__name__ == "PositionType":
+            return data.__repr__()
+        return data
+    
+    return replace_position_types(transform_record)
+
+
 def transform_sample(sample, transforms, label_fields=False, new_filepath=None):
     """Apply an Albumentations transform to the image
     and all label fields listed for the sample.
@@ -361,6 +374,7 @@ def transform_sample(sample, transforms, label_fields=False, new_filepath=None):
     transformed = transform(**kwargs)
     transform_record = transformed['replay']
     transform_record['transformed_sample_id'] = sample.id
+    transform_record = _serialize_transform_record(transform_record)
 
     transformed_image = transformed["image"]
 
@@ -800,6 +814,7 @@ def _store_last_transform(
 ):
     run_key = LAST_ALBUMENTATIONS_RUN_KEY
     transform_dict = A.Compose(transforms).to_dict()
+    transform_dict = _serialize_transform_record(transform_dict)
 
     config = dataset.init_run()
     config.transform = transform_dict
@@ -932,6 +947,7 @@ class AugmentWithAlbumentations(foo.Operator):
         )
         _config.icon = "/assets/icon.svg"
         return _config
+    
 
     def resolve_input(self, ctx):
         inputs = types.Object()
