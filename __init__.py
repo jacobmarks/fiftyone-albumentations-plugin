@@ -51,6 +51,8 @@ NAME_TO_TYPE = {
     'alpha_coef': 'float',
     'always_apply': 'bool',
     'blur_limit': 'tuple of int',
+    # 'border_mode': 'int',
+    'border_mode': 'border_mode',
     'brightness_by_max': 'bool',
     'brightness_coeff': 'float',
     'brightness_limit': 'tuple of float',
@@ -74,6 +76,7 @@ NAME_TO_TYPE = {
     'multiplier': 'tuple of float',
     'n_segments': 'int',
     'p': 'float',
+    'position': 'str',
     'p_replace': 'float',
     'quality_lower': 'int',
     'quality_upper': 'int',
@@ -112,6 +115,16 @@ SUPPORTED_TRANSFORMS = (
     *SUPPORTED_FUNCTIONAL_TRANSFORMS,
 )
 
+OPENCV_BORDER_MODES = {
+    "cv2.BORDER_CONSTANT": 0,
+    "cv2.BORDER_REPLICATE": 1,
+    "cv2.BORDER_REFLECT": 2,
+    "cv2.BORDER_WRAP": 3,
+    "cv2.BORDER_REFLECT_101": 4,
+    "cv2.BORDER_DEFAULT": 4,
+    "cv2.BORDER_TRANSPARENT": 5,
+    "cv2.BORDER_ISOLATED": 16,
+}
 
 def get_filepath(sample):
     return (
@@ -469,7 +482,10 @@ def _get_arg_details(arg):
                 arg_description = "".join(arg.split(":")[1:]).strip()
         else:
             arg_name = arg_name_and_type.split("(")[0].strip()
-            arg_type = _get_arg_type_str(arg_name_and_type)
+            if arg_name in NAME_TO_TYPE:
+                arg_type = NAME_TO_TYPE[arg_name]
+            else:
+                arg_type = _get_arg_type_str(arg_name_and_type)
             arg_description = "".join(arg.split(":")[1:]).strip()
         return {"name": arg_name, "type": arg_type, "description": arg_description}
     except:
@@ -501,6 +517,29 @@ def tuple_creator(inputs, arg_type):
     return input_adder
 
 
+def border_mode_creator(inputs):
+
+    default = "cv2.BORDER_REFLECT_101"
+
+    def input_adder(name, **input_args):
+        border_group = types.RadioGroup()
+
+        input_args.pop("default")
+
+        for key in OPENCV_BORDER_MODES.keys():
+            border_group.add_choice(key, label=key)
+
+        inputs.enum(
+            name,
+            border_group.values(),
+            default=default,
+            view=types.DropdownView(),
+            **input_args
+        )
+
+    return input_adder
+
+
 def _get_input_factory(inputs, arg_type):
     if arg_type == "bool":
         return inputs.bool
@@ -510,6 +549,8 @@ def _get_input_factory(inputs, arg_type):
         return inputs.float
     elif arg_type == "str":
         return inputs.str
+    elif arg_type == "border_mode":
+        return border_mode_creator(inputs)
     elif "int, int" in arg_type:
         return tuple_creator(inputs, "int")
     elif "float, float" in arg_type:
@@ -560,6 +601,11 @@ def _add_transform_inputs(inputs, transform_name):
 
         if arg_name in parameters:
             default = parameters[arg_name].default
+            try:
+                if default.__class__.__name__ == "PositionType":
+                    default = "center"
+            except:
+                pass
         if default is not None and default != None and default != inspect._empty:
             input_args["default"] = default
             input_args["required"] = False
@@ -583,6 +629,8 @@ def _extract_transform_inputs(ctx, transform_name):
         if param.startswith(prefix):
             param_name = param[len(prefix) :]
             transform_params[param_name] = ctx.params[param]
+            if "border_mode" in param_name:
+                transform_params[param_name] = OPENCV_BORDER_MODES[transform_params[param_name]]
     return transform_params
 
 
