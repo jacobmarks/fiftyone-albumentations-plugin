@@ -833,7 +833,8 @@ def _cleanup_last_transform(dataset):
     ids = results.new_sample_ids
     fps = dataset.select(ids).values("filepath")
     for fp in fps:
-        os.remove(fp)
+        if os.path.exists(fp):
+            os.remove(fp)
 
     dataset.delete_samples(ids)
 
