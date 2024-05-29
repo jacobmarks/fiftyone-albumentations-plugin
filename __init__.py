@@ -3,6 +3,7 @@
 
 import inspect
 import os
+import pkg_resources
 
 import albumentations as A
 import cv2
@@ -366,8 +367,11 @@ def transform_sample(sample, transforms, label_fields=False, new_filepath=None):
         kwargs["keypoints"] = keypoints
         kwargs["keypoint_labels"] = keypoint_labels
     else:
-        kwargs["keypoints"] = []
-        kwargs["keypoint_labels"] = []
+        change_version = '1.4.7'
+        installed_version = pkg_resources.get_distribution('albumentations').version
+        if pkg_resources.parse_version(installed_version) < pkg_resources.parse_version(change_version):
+            kwargs["keypoints"] = []
+            kwargs["keypoint_labels"] = []
 
     compose_kwargs = {}
     if has_boxes:
