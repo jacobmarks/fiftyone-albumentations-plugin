@@ -4,6 +4,7 @@
 import inspect
 import os
 import pkg_resources
+import tempfile
 
 import albumentations as A
 import cv2
@@ -328,10 +329,6 @@ def transform_sample(sample, transforms, label_fields=False, new_filepath=None):
     Currently does not handle:
     - instance segmentation masks.
     """
-    if new_filepath is None or new_filepath == None:
-        hash = _create_hash()
-        new_filepath = f"/tmp/{hash}.jpg"
-
 
     if not label_fields:
         label_fields = []
@@ -421,8 +418,13 @@ def transform_sample(sample, transforms, label_fields=False, new_filepath=None):
         }
 
     transformed_image = cv2.cvtColor(transformed_image, cv2.COLOR_RGB2BGR)
-    cv2.imwrite(new_filepath, transformed_image)
 
+    if new_filepath is None or new_filepath == None:
+        temp_dir = tempfile.gettempdir()
+        hash = _create_hash()
+        new_filepath = os.path.join(temp_dir, f"{hash}.jpg")
+            
+    cv2.imwrite(new_filepath, transformed_image)
     
     new_sample = fo.Sample(filepath=new_filepath, tags=['augmented'], transform=transform_record)
 
