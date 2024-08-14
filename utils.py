@@ -111,7 +111,7 @@ def _convert_bbox_from_albumentations(bbox):
 
 def _convert_keypoint_to_albumentations(keypoint, frame_size):
     """Convert FiftyOne keypoints to an Albumentations keypoints."""
-    return [keypoint[0] * frame_size[0], keypoint[1] * frame_size[1]]
+    return [keypoint[0] * (frame_size[0] - 1), keypoint[1] * (frame_size[1] - 1)]
 
 
 def _convert_keypoint_from_albumentations(keypoint, frame_size):
