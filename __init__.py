@@ -43,6 +43,7 @@ with add_sys_path(os.path.dirname(os.path.abspath(__file__))):
         _get_detections_fields,
         _get_keypoints_fields,
         _get_mask_fields,
+        _get_group,
         _join_lines_with_indentation,
     )
 
@@ -315,7 +316,18 @@ def _serialize_transform_record(transform_record):
     return replace_position_types(transform_record)
 
 
-def transform_sample(sample, transforms, label_fields=False, new_filepath=None):
+def _augment_group(group):
+    """Adds the "_augmented" suffix to the given Group's group name."""
+    return fo.Group(id=group.id, name=group.name + "_augmented")
+
+
+def transform_sample(
+    sample,
+    transforms,
+    label_fields=False,
+    new_filepath=None,
+    transform_group=False
+    ):
     """Apply an Albumentations transform to the image
     and all label fields listed for the sample.
 
@@ -392,6 +404,12 @@ def transform_sample(sample, transforms, label_fields=False, new_filepath=None):
 
     transformed_image = transformed["image"]
 
+    group = _get_group(sample)
+    if transform_group:
+        augmented_group = _augment_group(group)
+    else:
+        augmented_group = group
+
     if has_boxes:
         transformed_boxes = transformed["bboxes"]
         transformed_boxes = {
@@ -426,7 +444,12 @@ def transform_sample(sample, transforms, label_fields=False, new_filepath=None):
             
     cv2.imwrite(new_filepath, transformed_image)
     
-    new_sample = fo.Sample(filepath=new_filepath, tags=['augmented'], transform=transform_record)
+    new_sample = fo.Sample(
+        filepath=new_filepath,
+        tags=['augmented'],
+        transform=transform_record,
+        group=augmented_group
+        )
 
     if has_boxes:
         for detection_field in detection_fields:
@@ -1034,6 +1057,14 @@ class AugmentWithAlbumentations(foo.Operator):
             required=True,
         )
 
+        inputs.bool(
+            "group_name_transform",
+            label="Transform group name",
+            description="The transformation of the group name the sample belongs to.",
+            default=False,
+            required=True,
+        )
+
         _label_fields_input(ctx, inputs)
 
         num_transforms = ctx.params.get("num_transforms", 1)
@@ -1093,6 +1124,7 @@ class AugmentWithAlbumentations(foo.Operator):
                 transforms.extend(new_transforms)
 
         num_augs = ctx.params.get("num_augs", 1)
+        transform_group = ctx.params.get("group_name_transform", False)
 
         label_fields = _get_label_fields_to_transform(ctx)
 
@@ -1103,7 +1135,12 @@ class AugmentWithAlbumentations(foo.Operator):
 
         for sample in target_view:
             for _ in range(num_augs):
-                new_sample_id = transform_sample(sample, transforms, label_fields)
+                new_sample_id = transform_sample(
+                    sample,
+                    transforms,
+                    label_fields,
+                    transform_group=transform_group
+                    )
                 new_sample_ids.append(new_sample_id)
 
         _store_last_transform(

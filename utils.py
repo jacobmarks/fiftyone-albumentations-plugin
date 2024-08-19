@@ -127,6 +127,10 @@ def _get_label_fields(sample):
         if isinstance(sample[field_name], fo.Label)
     ]
 
+def _get_group(sample):
+    """Get group for the given sample."""
+    return sample["group"] if (isinstance(sample["group"], fo.Group)) else None
+
 
 def _get_detections_fields(sample, label_fields):
     """Get the names of the fields containing detections for the given sample."""
