@@ -1,5 +1,13 @@
 # Albumentations Data Augmentation Plugin for FiftyOne
 
+## Where to contribute
+
+Thank you for using this plugin. The Albumentations team is actively developing the [AlbumentationsX plugin for FiftyOne](https://github.com/albumentations-team/voxel51-plugin).
+
+Please report bugs and share feature requests in the [new repository's issue tracker](https://github.com/albumentations-team/voxel51-plugin/issues), where we will address them.
+
+This repository remains available for existing users.
+
 ![apply_from_saved](https://github.com/jacobmarks/fiftyone-albumentations-plugin/assets/12500356/bd2014be-bec0-4f4d-a0bd-6709921b5bb9)
 
 Traditionally, data augmentation is performed on-the-fly during training. This is great... *if* you know exactly what augmentations you want to apply to your dataset. 
